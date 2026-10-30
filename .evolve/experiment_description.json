@@ -1,0 +1,49 @@
+{
+  "name": "circan_alpha_evolve",
+  "title": "Circana Omni-Channel Retail Media Flighting & iROAS Optimizer",
+  "problem_description": "Optimize an 8-week, $2.5M CPG retail media and promotional flighting schedule across 5 Retail Media Networks (Walmart Connect, Target Roundel, Kroger Precision Marketing, Instacart, Amazon Fresh) using Circana Liquid Data response models. Each RMN exhibits a non-convex Hill S-curve response (dead zone below threshold, diminishing returns above inflection), a 3-week household pantry-depletion cannibalization cycle, cross-RMN household reach duplication penalties, discrete minimum flight spend floors ($25k), and weekly store inventory out-of-stock (OOS) caps. Maximize the normalized net incremental sales lift fitness score.",
+  "metric_name": "fitness_score",
+  "metric_direction": "maximize",
+  "eval_inputs": {
+    "total_budget_musd": 2.5,
+    "n_rmns": 5,
+    "n_weeks": 8,
+    "min_flight_musd": 0.025,
+    "pantry_cooldown_weeks": 3,
+    "random_seed": 42
+  },
+  "language": "python",
+  "allowed_imports": [
+    "numpy",
+    "math"
+  ],
+  "forbidden_imports": [
+    "os",
+    "sys",
+    "subprocess",
+    "socket"
+  ],
+  "initial_program_description": "Naive baseline that allocates the $2.5M campaign budget across the 5 RMNs and 8 weeks proportionally to each RMN's baseline scale without accounting for S-curve inflection thresholds, 3-week pantry stocking cannibalization, cross-RMN household overlap, or weekly store inventory caps.",
+  "evolve_block_description": "The allocate_rmn_flighting(params) function body that computes and returns the (5, 8) budget allocation matrix in $M across 5 Retail Media Networks and 8 campaign weeks.",
+  "evaluation_strategy": "COMPOSITE_MULTI_OBJECTIVE",
+  "timeout_seconds": 30,
+  "rungs": null,
+  "python_version": ">=3.11",
+  "dependencies": [
+    "numpy>=1.24",
+    "fastapi>=0.110",
+    "uvicorn>=0.27",
+    "pydantic>=2.0",
+    "requests>=2.28"
+  ],
+  "source_file": null,
+  "source_code": null,
+  "source_files": null,
+  "constraints": [
+    "Output must be a 2D numpy float array of shape (5, 8) representing weekly spend in $M per RMN.",
+    "All allocations must be non-negative and total spend must not exceed total_budget_musd ($2.50M).",
+    "Any non-zero weekly flight must be at least min_flight_musd ($0.025M = $25k) or exactly 0.0.",
+    "Must be deterministic and complete within 30 seconds."
+  ]
+}
+

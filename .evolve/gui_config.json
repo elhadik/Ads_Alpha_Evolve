@@ -1,0 +1,20 @@
+{
+  "concurrency": 10,
+  "max_programs": 100,
+  "max_iterations": 100,
+  "timeout_seconds": 60,
+  "backend": "local",
+  "reset_interval": 25,
+  "model_preset": "mix-90-10",
+  "primary_model": "gemini-3.5-flash",
+  "primary_weight": 0.9,
+  "secondary_model": "gemini-3.1-pro-preview",
+  "secondary_weight": 0.1,
+  "gcp_project": "circana-ads-ai-prod",
+  "gcp_engine": "circana-alphaevolve-engine",
+  "gcp_location": "global",
+  "experiment_title": "Circana Omni-Channel Retail Media Flighting & iROAS Optimizer",
+  "total_budget_musd": 2.5,
+  "min_flight_musd": 0.025,
+  "pantry_cooldown_weeks": 3
+}
