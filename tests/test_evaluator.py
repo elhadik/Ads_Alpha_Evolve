@@ -11,7 +11,8 @@ import pytest
 
 from evaluator import evaluate_program
 
-INITIAL_CODE = pathlib.Path(__file__).with_name("initial_program.py").read_text(encoding="utf-8")
+ROOT_DIR = pathlib.Path(__file__).resolve().parent.parent
+INITIAL_CODE = (ROOT_DIR / "initial_program.py").read_text(encoding="utf-8")
 
 
 def test_evaluate_program_returns_score_and_insights():
@@ -55,9 +56,8 @@ def test_cli_main_writes_output_file():
     """Running evaluator.py as a CLI script writes a valid JSON output file."""
     tmpdir = tempfile.mkdtemp()
     try:
-        base_dir = pathlib.Path(__file__).resolve().parent
-        shutil.copy(base_dir / "initial_program.py", os.path.join(tmpdir, "initial_program.py"))
-        shutil.copy(base_dir / "evaluator.py", os.path.join(tmpdir, "evaluator.py"))
+        shutil.copy(ROOT_DIR / "initial_program.py", os.path.join(tmpdir, "initial_program.py"))
+        shutil.copy(ROOT_DIR / "evaluator.py", os.path.join(tmpdir, "evaluator.py"))
         output_file = os.path.join(tmpdir, "scores.json")
 
         cmd = [
@@ -83,4 +83,26 @@ def test_cli_main_writes_output_file():
         assert isinstance(data["insights"], list)
     finally:
         shutil.rmtree(tmpdir)
+
+
+def test_all_eight_national_and_pdi_milestones_increase_monotonically():
+    """All 8 candidate milestones (5 National + 3 PDI Geo-Temporal) evaluate cleanly and increase."""
+    from webapp.server import AlphaEvolveGuiConfig, simulate_evolution
+
+    res = simulate_evolution(AlphaEvolveGuiConfig())
+    milestones = res["milestones"]
+    assert len(milestones) == 8
+
+    scores = [m["score"] for m in milestones]
+    for i in range(1, len(scores)):
+        assert scores[i] > scores[i - 1], f"Milestone {i} did not improve: {scores}"
+
+    # Verify National Champion (Gen 5) vs PDI Geo-Temporal Champion (Gen 8)
+    assert milestones[0]["score"] == pytest.approx(196.49, abs=0.1)
+    assert milestones[4]["score"] == pytest.approx(522.33, abs=0.1)
+    assert milestones[5]["score"] == pytest.approx(589.40, abs=0.2)
+    assert milestones[6]["score"] == pytest.approx(641.25, abs=0.2)
+    assert milestones[7]["score"] == pytest.approx(684.90, abs=0.2)
+    assert milestones[7]["telemetry"]["pdi_enabled"] is True
+    assert milestones[7]["telemetry"]["pdi_geo_dividend_musd"] > 4.0
 

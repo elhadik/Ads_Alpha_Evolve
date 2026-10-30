@@ -52,3 +52,26 @@ def test_evaluate_is_deterministic():
     r2 = evaluate(EVAL_INPUTS)
     assert r1["fitness_score"] == pytest.approx(r2["fitness_score"], abs=1e-9)
 
+
+def test_pdi_geospatial_tensors_l2_normalized_and_worldpop_populated():
+    """build_circana_campaign_model() includes 330-D unit-L2 PDI embeddings & WorldPop 100m arrays."""
+    model = build_circana_campaign_model(EVAL_INPUTS)
+    assert "pdi_330d_embeddings" in model
+    assert "pdi_worldpop_100m_pop" in model
+    assert "pdi_sliver_area_km2" in model
+    assert "pdi_thermal_temp_f" in model
+
+    emb = model["pdi_330d_embeddings"]
+    assert emb.shape == (5, 15, 330)
+    norms = np.linalg.norm(emb, axis=2)
+    assert np.allclose(norms, 1.0, atol=1e-5)
+
+    wp = model["pdi_worldpop_100m_pop"]
+    area = model["pdi_sliver_area_km2"]
+    assert wp.shape == (5, 15)
+    assert area.shape == (5, 15)
+    # WorldPop residential capture in core cells (0..11) must exceed naive area capture
+    wp_share = np.sum(wp[:, :12], axis=1) / np.sum(wp, axis=1)
+    area_share = np.sum(area[:, :12], axis=1) / np.sum(area, axis=1)
+    assert np.all(wp_share > area_share)
+

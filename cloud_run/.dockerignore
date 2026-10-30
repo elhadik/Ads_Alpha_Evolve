@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.git/
+.DS_Store
+presentations/
+static/demo_walkthrough.webm
+static/demo_walkthrough.gif
+webapp/static

@@ -13,7 +13,11 @@
   "gcp_project": "circana-ads-ai-prod",
   "gcp_engine": "circana-alphaevolve-engine",
   "gcp_location": "global",
-  "experiment_title": "Circana Omni-Channel Retail Media Flighting & iROAS Optimizer",
+  "experiment_title": "Circana × Google Maps PDI Geo-Temporal Retail Media Optimizer",
+  "pdi_dataset": "s2_z12_and_postal",
+  "custom_boundary_rollup": "worldpop_100m_l2",
+  "pdi_ablation_slice": "full_330d",
+  "sister_sim_threshold": 0.85,
   "total_budget_musd": 2.5,
   "min_flight_musd": 0.025,
   "pantry_cooldown_weeks": 3

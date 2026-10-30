@@ -173,6 +173,18 @@ def evaluate_program(
                     ),
                 }
             )
+            if "pdi_cosine_sim_match" in result:
+                insights.append(
+                    {
+                        "label": "pdi_geospatial_insights",
+                        "text": (
+                            f"PDI Active: {result.get('pdi_enabled', False)} | "
+                            f"Sister-Region Cosine Match: {result.get('pdi_cosine_sim_match', 0):.2f} | "
+                            f"PDI Geo Dividend: +${result.get('pdi_geo_dividend_musd', 0):.2f}M | "
+                            f"WorldPop Capture: {result.get('worldpop_residential_capture_pct', 0):.1f}%"
+                        ),
+                    }
+                )
 
         return {
             "score": round(score_val, 4),

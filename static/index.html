@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Circana Liquid Data® × Google Maps PDI × AlphaEvolve — Geo-Temporal Retail Media Optimizer</title>
+  <link rel="stylesheet" href="styles.css" onerror="this.href='/static/styles.css'" />
+</head>
+<body>
+  <!-- Top Navbar -->
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-badge">🧬🌍</div>
+      <div>
+        <div class="brand-title-row">
+          <h1>Circana Liquid Data® × Google Maps PDI × AlphaEvolve</h1>
+          <span class="pill pill-accent">Geo-Temporal RMN Flighting</span>
+          <span class="pill pill-pdi">BigQuery S2 Level 12 + WorldPop 100m</span>
+        </div>
+        <p class="subtitle">
+          Evolutionary Code Discovery with 330-D Population Dynamics Insights (Search `[0:127]`, Maps POIs `[128:255]`, Weather `[256:329]`)
+        </p>
+      </div>
+    </div>
+
+    <div class="topbar-actions">
+      <div class="ae-cli-badge" id="aeCliBadge" title="AlphaEvolve + BigQuery PDI Status">
+        <span class="status-dot"></span>
+        <span id="aeCliStatusText">ae 0.2.8 • BigQuery PDI S2 Ready</span>
+      </div>
+      <button id="toggleGmpKeyBtn" class="btn btn-secondary" type="button">
+        🗺️ Live Google Maps Key
+      </button>
+      <button id="playEvolutionBtn" class="btn btn-primary" type="button">
+        ▶ Play Geo-Evolution
+      </button>
+      <button id="resetEvolutionBtn" class="btn btn-secondary" type="button">
+        ⏮ Reset to Seed
+      </button>
+    </div>
+  </header>
+
+  <!-- Optional Google Maps Demo Key / API Key Drawer (Compliance: Never hardcode key) -->
+  <div id="gmpKeyBanner" class="gmp-key-banner hidden">
+    <div class="gmp-key-inner">
+      <div>
+        <strong>🗺️ Google Maps Platform Live Vector Map (`<gmp-map>` + `GoogleMapsOverlay` S2Layer):</strong>
+        <span>
+          Enter your `GOOGLE_MAPS_API_KEY` or mint a zero-cost prototyping
+          <a href="https://mapsplatform.google.com/maps-demo-key?utm_campaign=gmp_git_agentskills_v1" target="_blank" rel="noopener" style="color:#38bdf8;">Maps Demo Key</a>.
+          (Interactive WebGL/Canvas S2 Level 12 Vector Simulation is active by default.)
+        </span>
+      </div>
+      <div class="gmp-key-controls">
+        <input id="gmpApiKeyInput" type="password" placeholder="Paste GOOGLE_MAPS_API_KEY..." />
+        <button id="loadLiveGmpBtn" class="btn btn-accent btn-sm" type="button">Load Live `<gmp-map>`</button>
+      </div>
+    </div>
+  </div>
+
+  <main class="main-layout">
+    <!-- Left Sidebar: Editable AlphaEvolve Runtime, Google Maps PDI Config & Milestones -->
+    <aside class="config-sidebar" aria-label="AlphaEvolve & PDI Configuration">
+      <div class="card config-card">
+        <div class="card-header">
+          <h2>⚙️ AlphaEvolve × PDI Config</h2>
+          <span class="badge-muted">Editable Live</span>
+        </div>
+
+        <form id="aeConfigForm" class="config-form">
+          <div class="section-label">1. Evolutionary Run Settings (`RunSettings`)</div>
+
+          <div class="form-grid-2">
+            <div class="field">
+              <label for="cfgConcurrency">Concurrency (`--concurrency`)</label>
+              <input id="cfgConcurrency" type="number" min="1" max="30" value="10" />
+              <span class="field-hint">Parallel workers (1–30)</span>
+            </div>
+
+            <div class="field">
+              <label for="cfgMaxPrograms">Max Generated (`--max-programs`)</label>
+              <input id="cfgMaxPrograms" type="number" min="10" max="5000" step="10" value="100" />
+              <span class="field-hint">Backend generation cap</span>
+            </div>
+          </div>
+
+          <div class="form-grid-2">
+            <div class="field">
+              <label for="cfgMaxIterations">Max Evaluated (`--max-iterations`)</label>
+              <input id="cfgMaxIterations" type="number" min="10" max="5000" step="10" value="100" />
+              <span class="field-hint">3-tier evaluator cap</span>
+            </div>
+
+            <div class="field">
+              <label for="cfgModelPreset">LLM Ensemble (`--models`)</label>
+              <select id="cfgModelPreset">
+                <option value="mix-90-10" selected>90/10 (Flash 3.5 + Pro 3.1)</option>
+                <option value="gemini-4-argon">gemini-4-argon (Deep)</option>
+                <option value="gemini-3.5-flash">gemini-3.5-flash (Fast)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="section-label pdi-highlight">2. 🌍 Google Maps PDI &amp; BigQuery GIS Settings</div>
+
+          <div class="field">
+            <label for="cfgPdiDataset">BigQuery Analytics Hub PDI Dataset</label>
+            <select id="cfgPdiDataset">
+              <option value="s2_z12" selected>S2 Level 12 (`population_dynamics___us.v1_s2_z12`)</option>
+              <option value="postal_codes">US Postal Codes Monthly (`snapshot_date` Place IDs)</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="cfgBoundaryRollup">Custom Trade-Area Polygon Aggregation</label>
+            <select id="cfgBoundaryRollup">
+              <option value="worldpop" selected>WorldPop 100m Weighted (`EE ST_REGIONSTATS` + L2)</option>
+              <option value="area">Naive Area-Weighted Sliver (`ST_AREA` Unweighted)</option>
+            </select>
+            <span class="field-hint">Weights S2 slivers inside 5km store trade radii</span>
+          </div>
+
+          <div class="field">
+            <label for="cfgPdiSlice">330-D PDFM Embedding Feature Ablation</label>
+            <select id="cfgPdiSlice">
+              <option value="all_330" selected>All 330 Dims (Search + POIs/Busyness + Weather)</option>
+              <option value="search_0_127">Dims [0:127] — Search Trends (Intent &amp; S-Curve Knee)</option>
+              <option value="poi_128_255">Dims [128:255] — Maps POIs &amp; Busyness (RMN Overlap)</option>
+              <option value="weather_256_329">Dims [256:329] — Weather &amp; AQI (Pantry Velocity)</option>
+            </select>
+          </div>
+
+          <div class="form-grid-2">
+            <div class="field">
+              <label for="cfgSimThreshold">Sister-Region Cosine Sim (&tau;)</label>
+              <input id="cfgSimThreshold" type="number" step="0.02" min="0.60" max="0.96" value="0.85" />
+              <span class="field-hint">`ML.DISTANCE` cutoff</span>
+            </div>
+            <div class="field">
+              <label for="cfgBudget">Campaign Budget ($M)</label>
+              <input id="cfgBudget" type="number" step="0.25" min="0.5" max="15.0" value="2.50" />
+              <span class="field-hint">8-week total spend</span>
+            </div>
+          </div>
+
+          <div class="form-grid-2">
+            <div class="field">
+              <label for="cfgMinFlight">Min Flight ($M)</label>
+              <input id="cfgMinFlight" type="number" step="0.005" min="0.0" max="0.25" value="0.025" />
+            </div>
+            <div class="field">
+              <label for="cfgCooldown">Base Pantry Cycle (Wks)</label>
+              <input id="cfgCooldown" type="number" step="1" min="1" max="6" value="3" />
+            </div>
+          </div>
+
+          <button type="submit" id="applyConfigBtn" class="btn btn-accent btn-full">
+            ⚡ Apply PDI + AE Config &amp; Recompute Charts
+          </button>
+        </form>
+      </div>
+
+      <!-- Milestone Timeline Selector (8 Stages: 5 National Baseline + 3 PDI Geo-Temporal) -->
+      <div class="card milestones-card">
+        <div class="card-header">
+          <h2>🏆 Evolution Trajectory (Baseline ➔ +PDI)</h2>
+          <span id="improvementBadge" class="pill pill-success">+248.6% Score</span>
+        </div>
+        <div id="milestoneList" class="milestone-list"></div>
+      </div>
+    </aside>
+
+    <!-- Right Main Workspace -->
+    <section class="workspace-content">
+      <!-- 3-Tier Baseline vs. PDI Impact Banner -->
+      <div class="impact-comparison-bar">
+        <div class="comparison-tier">
+          <span class="tier-tag" style="color:#94a3b8;">1. Gen 1 Naive National Seed</span>
+          <div class="tier-metrics">Score: 196.49 • Lift: +$6.82M</div>
+          <div class="tier-sub">iROAS: 2.73x • 55.7% Dead-Zone &amp; Geo Smear Waste</div>
+        </div>
+        <div class="comparison-tier">
+          <span class="tier-tag" style="color:#38bdf8;">2. Gen 5 National AlphaEvolve (Baseline)</span>
+          <div class="tier-metrics text-sky">Score: 522.33 • Lift: +$16.72M</div>
+          <div class="tier-sub">iROAS: 6.69x (+165.8%) • Blind to Local S2/ZIP Dynamics</div>
+        </div>
+        <div class="comparison-tier">
+          <span class="tier-tag" style="color:#34d399;">3. Gen 8 AlphaEvolve + Google Maps PDI</span>
+          <div class="tier-metrics text-emerald" id="bannerPdiMetrics">Score: 684.90 • Lift: +$21.05M</div>
+          <div class="tier-sub" id="bannerPdiSub">iROAS: 8.42x (+31.1% over National AE • +$4.33M Geo Dividend!)</div>
+        </div>
+      </div>
+
+      <!-- Evolution Progress Scrubber Bar -->
+      <div class="card scrubber-card">
+        <div class="scrubber-top">
+          <div>
+            <span class="stage-tag" id="activeNicknameBadge">pdi-multimodal-geo-temporal-champion</span>
+            <strong id="activeSummaryTitle" class="stage-title">Loading evolutionary trajectory...</strong>
+          </div>
+          <div class="scrubber-controls">
+            <span class="scrubber-label">Evolution Milestone:</span>
+            <input id="stageSlider" type="range" min="0" max="7" step="1" value="7" />
+            <span id="stageCounterBadge" class="mono-badge">Eval 100 / 100</span>
+          </div>
+        </div>
+        <p id="activeWhatChanged" class="stage-detail"></p>
+      </div>
+
+      <!-- 6-Card Live Telemetry Strip -->
+      <div class="kpi-grid">
+        <div class="kpi-card">
+          <div class="kpi-label">Evaluated / Workers</div>
+          <div class="kpi-value mono" id="kpiEvaluated">100 / 100</div>
+          <div class="kpi-sub" id="kpiModelUsed">10 workers • 90/10 Flash+Pro</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Incremental Sales Lift</div>
+          <div class="kpi-value text-emerald" id="kpiLift">+$21.05M</div>
+          <div class="kpi-sub" id="kpiLiftDelta">+$4.33M above National AE</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Campaign iROAS</div>
+          <div class="kpi-value text-sky" id="kpiRoas">8.42x</div>
+          <div class="kpi-sub" id="kpiRoasSub">vs. 6.69x National AE ($2.50M)</div>
+        </div>
+        <div class="kpi-card kpi-pdi">
+          <div class="kpi-label">PDI Sister-Region Match</div>
+          <div class="kpi-value mono text-cyan" id="kpiPdiMatch">0.91 Sim</div>
+          <div class="kpi-sub" id="kpiPdiSub">WorldPop 100m + L2 Normalized</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Ad / Pantry / Geo Waste</div>
+          <div class="kpi-value text-amber" id="kpiWaste">7.2%</div>
+          <div class="kpi-sub" id="kpiLossBreakdown">Down from 55.7% (Seed) &amp; 16.4% (Nat)</div>
+        </div>
+        <div class="kpi-card kpi-pdi">
+          <div class="kpi-label">AE × PDI Fitness Score</div>
+          <div class="kpi-value mono text-emerald" id="kpiScore">684.90</div>
+          <div class="kpi-sub" id="kpiScoreDelta">+31.1% vs. Baseline AE (522.33)</div>
+        </div>
+      </div>
+
+      <!-- INTEGRATED GOOGLE MAPS PLATFORM × PDI S2 LEVEL 12 & TRADE-AREA STUDIO -->
+      <div class="card pdi-geo-studio-card">
+        <div class="card-header">
+          <div>
+            <h3>🗺️ Google Maps Platform × Population Dynamics Insights (PDI) — S2 Level 12 &amp; Custom Trade-Area Explorer</h3>
+            <p class="chart-sub">
+              Click any S2 Level 12 cell (`geo_id`) or Postal Code (`geo_name`) to set the Seed Trade Area, inspect its 330-D PDFM GNN vector, and highlight Sister Regions (`ML.DISTANCE` Cosine Similarity)
+            </p>
+          </div>
+          <span class="pill pill-pdi" id="activeRollupPill">WorldPop 100m Weighted (`ST_REGIONSTATS`)</span>
+        </div>
+
+        <div class="geo-toolbar">
+          <div class="metro-tabs" id="metroTabs">
+            <button type="button" class="metro-btn active" data-metro="dfw">🤠 Dallas–Fort Worth (`862a107` • Sunbelt Heatwave)</button>
+            <button type="button" class="metro-btn" data-metro="ord">🏙️ Chicago Metro (`882681b` • High RMN Overlap)</button>
+            <button type="button" class="metro-btn" data-metro="atl">🍑 Atlanta Metro (`844f92c` • Sister-Region Hub)</button>
+            <button type="button" class="metro-btn" data-metro="phx">☀️ Phoenix Metro (`8529a41` • 2-Wk Pantry Velocity)</button>
+            <button type="button" class="metro-btn" data-metro="sea">🌲 Seattle Metro (`8428f19` • Instacart/AMZ Core)</button>
+          </div>
+
+          <div class="layer-mode-group">
+            <label for="mapColorMode">Map Layer Metric:</label>
+            <select id="mapColorMode">
+              <option value="similarity" selected>PDI Cosine Similarity to Seed (`ML.DISTANCE`)</option>
+              <option value="worldpop">WorldPop 100m Weight vs. Raw Area Sliver</option>
+              <option value="search_intent">PDI Search Trends `[0:127]` (Beverage Intent)</option>
+              <option value="poi_overlap">PDI Maps POIs &amp; Busyness `[128:255]` (RMN Overlap)</option>
+              <option value="weather_pantry">PDI Weather &amp; AQI `[256:329]` (Pantry Depletion)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="geo-split-layout">
+          <!-- Left: Authentic Google Maps PDI Playground White Card (Map + Color Scale + Per-Cell Breakdown Graph) -->
+          <div class="gmp-playground-white-card">
+            <div class="pg-card-header">
+              <div class="pg-card-title" id="pgTopTitle">
+                Total Difference in Incremental Lift &amp; PDI Sister-Region Score between Oct '25 and Jan '24
+              </div>
+              <div class="pg-card-subtitle">
+                (Click on an H3 / S2 cell on the map to breakdown for that cell only in the graph below)
+              </div>
+            </div>
+
+            <div class="pg-mode-switch-bar" id="pgModeSwitchBar">
+              <button type="button" class="pg-mode-btn active" data-pgmode="h3_hex">
+                ⬢ H3 / Postal Choropleth Grid (`bdd-maps-api-playground`)
+              </button>
+              <button type="button" class="pg-mode-btn" data-pgmode="s2_heatmap">
+                ⬛ S2 Level 12 Continuous Heatmap (Midtown / Empire State Seed)
+              </button>
+            </div>
+
+            <div class="map-viewport-wrapper">
+              <canvas id="pdiMapCanvas" width="679" height="340"></canvas>
+              <div id="gmpLiveMap" style="display:none;"></div>
+            </div>
+
+            <div class="pg-scale-row">
+              <div class="pg-scale-left">
+                <span>Change in Lift / PDI Score</span>
+                <span>-5</span>
+                <span class="pg-gradient-bar" title="-5 to +18 PDI Lift Index"></span>
+                <span>18</span>
+              </div>
+              <span class="pg-selected-cell-tag" id="hudSeedLabel">
+                Selected Cell: `882a100d29` • Financial District (ZIP 10005) • +18.0 Lift
+              </span>
+            </div>
+
+            <div class="pg-bottom-chart-wrap">
+              <div class="pg-card-header" style="margin-bottom:0.2rem;">
+                <div class="pg-card-title" style="font-size:0.86rem;">
+                  Incremental Sales Lift &amp; POI Visit Count by Month and RMN Type
+                </div>
+                <div class="pg-card-subtitle">
+                  (Click on an H3 / S2 cell above to show the counts &amp; lift trajectory for that cell only)
+                </div>
+              </div>
+              <canvas id="playgroundCellChartCanvas" width="660" height="195"></canvas>
+            </div>
+
+            <div class="gmp-attribution-footer" style="color:#475569;">
+              Google Maps • <span id="hudMetroLabel">Metro: New York / Tri-State PDI Playground + 5-Hub Trade Areas</span>
+            </div>
+          </div>
+
+          <!-- Right: Multimodal PDFM Foundation Model Card (Slide 40) + S2 Heatmap Preview + 330-D Fingerprint -->
+          <div class="pdi-right-column">
+            <div class="pdi-multimodal-white-card">
+              <div class="pdi-visual-pair">
+                <div>
+                  <img src="s40_pdi_diagram_4.png" onerror="this.src='/static/s40_pdi_diagram_4.png'" alt="Powered by multimodal, privacy-preserving signals — PDFM Graph Neural Network" />
+                  <div class="pdi-visual-caption">Population Dynamics Foundation Model (330-D GNN)</div>
+                </div>
+                <div>
+                  <img id="secondaryMapPreviewImg" src="s38_s2_map_4.png" onerror="this.src='/static/s38_s2_map_4.png'" alt="Google Maps S2 Level 12 Continuous Heatmap with Seed Cell" />
+                  <div class="pdi-visual-caption">S2 Level 12 Continuous Similarity &amp; Seed Cell (`□`)</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="pdi-fingerprint-panel">
+              <div class="cell-id-header">
+                <div>
+                  <div class="cell-title" id="fpCellTitle">Financial District / Lower Manhattan Core</div>
+                  <div class="cell-tokens" id="fpCellTokens">H3/S2 `geo_id`: 882a100d29 • ZIP `geo_name`: 10005 • Place ID: ChIJnyc10005</div>
+                </div>
+                <span class="pill pill-success" id="fpSimBadge">Cosine Sim: 0.96</span>
+              </div>
+
+              <div class="pdi-slice-list">
+                <!-- Slice 1: Search Trends [0:127] -->
+                <div class="pdi-slice-box">
+                  <div class="slice-top">
+                    <span class="text-sky">1. Aggregated Search Trends (`features[0 : 127]` • 128 dims)</span>
+                    <span class="mono text-sky" id="fpSearchVal">0.94 Affinity</span>
+                  </div>
+                  <div class="slice-bar-track">
+                    <div class="slice-bar-fill" id="fpSearchBar" style="width:94%; background:linear-gradient(90deg,#f59e0b,#38bdf8);"></div>
+                  </div>
+                  <div class="slice-impact" id="fpSearchImpact">
+                    Normalized histogram of top 1,000 topics ➔ lowers Hill threshold &kappa;<sub>r,g</sub> by <strong>-22%</strong> &amp; boosts max lift <strong>1.35&times;</strong>
+                  </div>
+                </div>
+
+                <!-- Slice 2: Maps POIs & Busyness [128:255] -->
+                <div class="pdi-slice-box">
+                  <div class="slice-top">
+                    <span class="text-cyan">2. Maps POIs &amp; Busyness / Mobility (`features[128 : 255]` • 128 dims)</span>
+                    <span class="mono text-cyan" id="fpPoiVal">14% Local Overlap</span>
+                  </div>
+                  <div class="slice-bar-track">
+                    <div class="slice-bar-fill" id="fpPoiBar" style="width:82%; background:linear-gradient(90deg,#16a34a,#a855f7);"></div>
+                  </div>
+                  <div class="slice-impact" id="fpPoiImpact">
+                    Top POI categories + monthly visit histogram ➔ decouples low-overlap RMNs (`14%` local vs `28%` national)
+                  </div>
+                </div>
+
+                <!-- Slice 3: Weather & Air Quality [256:329] -->
+                <div class="pdi-slice-box">
+                  <div class="slice-top">
+                    <span class="text-amber">3. Weather &amp; Air Quality (`features[256 : 329]` • 74 dims)</span>
+                    <span class="mono text-amber" id="fpWeatherVal">96°F • 2-Wk Pantry</span>
+                  </div>
+                  <div class="slice-bar-track">
+                    <div class="slice-bar-fill" id="fpWeatherBar" style="width:88%; background:linear-gradient(90deg,#dc2626,#10b981);"></div>
+                  </div>
+                  <div class="slice-impact" id="fpWeatherImpact">
+                    Thermal &amp; AQI metrics ➔ accelerates beverage depletion from <strong>3 weeks to 2 weeks</strong> (+1 extra flight cycle!)
+                  </div>
+                </div>
+              </div>
+
+              <div class="worldpop-callout" id="fpWorldpopCallout">
+                <strong>🌍 WorldPop 100m (`ST_REGIONSTATS`) vs. Area Weight:</strong>
+                This cell holds <strong>34.2%</strong> of the trade area's residential shoppers despite covering only <strong>14.8%</strong> of raw land area (<strong>2.3&times;</strong> population density leverage).
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3x2 Dynamic Optimization Charts Grid Showing Improvement Over Baseline -->
+      <div class="charts-grid">
+        <!-- Chart 1: Dual Evolutionary Fitness Progression (Baseline AE vs PDI-Enhanced AE) -->
+        <div class="card chart-card">
+          <div class="card-header">
+            <div>
+              <h3>1. Evolutionary Fitness Frontier (`National Baseline` vs. `+Google Maps PDI`)</h3>
+              <p class="chart-sub">Solid Emerald = Geo-Temporal PDI Frontier (`684.90`) | Dashed Sky = National-Only AE Baseline (`522.33`)</p>
+            </div>
+            <span class="badge-muted" id="chart1CapBadge">+31.1% PDI Breakthrough</span>
+          </div>
+          <canvas id="evoChartCanvas" width="540" height="225"></canvas>
+        </div>
+
+        <!-- Chart 2: PDI-Shifted Hill S-Curve Operating Points -->
+        <div class="card chart-card">
+          <div class="card-header">
+            <div>
+              <h3>2. PDI Sister-Region Hill S-Curve Shift &amp; Operating Points</h3>
+              <p class="chart-sub">Targeting PDI Sister S2 Cells (`Sim ≥ 0.85`, `dims 0:127`) shifts the S-curve upward &amp; lowers inflection &kappa;<sub>r,g</sub></p>
+            </div>
+            <span class="badge-muted">Emerald = PDI Sister Curve</span>
+          </div>
+          <canvas id="scurveChartCanvas" width="540" height="225"></canvas>
+        </div>
+
+        <!-- Chart 3: 5 RMNs x 8 Weeks Geo-Temporal Flighting Schedule Heatmap -->
+        <div class="card chart-card">
+          <div class="card-header">
+            <div>
+              <h3>3. 8-Week × 5-RMN Geo-Temporal Flighting Plan ($k &amp; Target S2 Hub)</h3>
+              <p class="chart-sub">Each pulse displays spend (`$k`) + target PDI Sister S2 cluster (`DFW`, `ORD`, `ATL`, `PHX`, `SEA`) &amp; adaptive cooldown</p>
+            </div>
+            <span class="badge-muted">5 RMNs × 8 Weeks × S2 Clusters</span>
+          </div>
+          <canvas id="heatmapChartCanvas" width="540" height="225"></canvas>
+        </div>
+
+        <!-- Chart 4: Cumulative Weekly Incremental Sales Lift ($M) — 3-Curve Comparison -->
+        <div class="card chart-card">
+          <div class="card-header">
+            <div>
+              <h3>4. Cumulative Incremental Sales Lift ($M) — 3-Tier Comparison</h3>
+              <p class="chart-sub">Emerald = AlphaEvolve + PDI (`+$21.05M`) | Sky = National AE (`+$16.72M`) | Gray = Naive Seed (`+$6.82M`)</p>
+            </div>
+            <span class="pill pill-success" id="chart4LiftDelta">+$4.33M PDI Geo Dividend</span>
+          </div>
+          <canvas id="weeklyLiftChartCanvas" width="540" height="225"></canvas>
+        </div>
+
+        <!-- Chart 5 (NEW): PDI 330-D Modality Ablation & iROAS Attribution -->
+        <div class="card chart-card">
+          <div class="card-header">
+            <div>
+              <h3>5. PDI 330-D Vector Ablation — Marginal iROAS Lift by Embedding Block</h3>
+              <p class="chart-sub">Decomposing the `2.73x ➔ 6.69x ➔ 8.42x` iROAS gain across Search `[0:127]`, POIs `[128:255]`, Weather `[256:329]` &amp; WorldPop</p>
+            </div>
+            <span class="badge-muted">330-D PDFM GNN Slices</span>
+          </div>
+          <canvas id="ablationChartCanvas" width="540" height="225"></canvas>
+        </div>
+
+        <!-- Chart 6 (NEW): Custom Boundary Rollup — WorldPop 100m vs. Naive Area Weighting -->
+        <div class="card chart-card">
+          <div class="card-header">
+            <div>
+              <h3>6. Custom Store Boundary Rollup: WorldPop 100m (`ST_REGIONSTATS`) vs. Area-Weighted</h3>
+              <p class="chart-sub">Incremental lift ($M) across the 5 Metro Trade Areas when weighting S2 slivers by population vs. raw land area</p>
+            </div>
+            <span class="badge-muted">BigQuery + Earth Engine</span>
+          </div>
+          <canvas id="worldpopChartCanvas" width="540" height="225"></canvas>
+        </div>
+      </div>
+
+      <!-- Bottom Inspector: Live # EVOLVE-BLOCK Geo-Temporal Code, BigQuery SQL, Diff & ae CLI -->
+      <div class="card inspector-card">
+        <div class="tabs-header">
+          <div class="tab-buttons">
+            <button class="tab-btn active" data-tab="tabCode" type="button">🧬 `# EVOLVE-BLOCK` Geo-Temporal Python Code</button>
+            <button class="tab-btn" data-tab="tabSql" type="button">🗄️ BigQuery GIS + PDI + WorldPop SQL Pipeline</button>
+            <button class="tab-btn" data-tab="tabDiff" type="button">🔍 Unified Diff vs. National Baseline</button>
+            <button class="tab-btn" data-tab="tabCli" type="button">💻 `ae` CLI Commands &amp; Evaluator Insights</button>
+          </div>
+          <button id="evalCustomCodeBtn" class="btn btn-primary btn-sm" type="button">
+            🧪 Simulate &amp; Evaluate Candidate
+          </button>
+        </div>
+
+        <!-- Tab 1: Editable Evolve Block Code -->
+        <div id="tabCode" class="tab-pane active">
+          <textarea id="codeEditorTextarea" rows="13" spellcheck="false"></textarea>
+        </div>
+
+        <!-- Tab 2: BigQuery GIS + Earth Engine WorldPop + PDI Cosine Similarity SQL -->
+        <div id="tabSql" class="tab-pane hidden">
+          <pre id="sqlViewerPre" class="code-pre"></pre>
+        </div>
+
+        <!-- Tab 3: Unified Diff -->
+        <div id="tabDiff" class="tab-pane hidden">
+          <pre id="diffViewerPre" class="code-pre"></pre>
+        </div>
+
+        <!-- Tab 4: Generated ae CLI Commands & Evaluator Insights -->
+        <div id="tabCli" class="tab-pane hidden">
+          <div class="cli-insights-grid">
+            <div>
+              <h4>Generated `ae` CLI Launch Sequence</h4>
+              <pre id="cliCommandsPre" class="code-pre"></pre>
+            </div>
+            <div>
+              <h4>3-Tier Geo-Temporal Evaluator Output (`AlphaEvolveEvaluationInsights`)</h4>
+              <pre id="evaluatorInsightsPre" class="code-pre"></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="app.js" onerror="const s=document.createElement('script');s.src='/static/app.js';document.body.appendChild(s);"></script>
+</body>
+</html>

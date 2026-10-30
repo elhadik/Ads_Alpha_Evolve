@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+cd "${ROOT_DIR}"
+
 export PATH="$HOME/.local/bin:$HOME/.local/google-cloud-sdk/bin:$PATH"
 
 # Use Application Default Credentials access token if available so reauth prompts are avoided
@@ -11,7 +15,7 @@ if [[ -z "${CLOUDSDK_AUTH_ACCESS_TOKEN:-}" ]]; then
   fi
 fi
 
-SERVICE_NAME="${SERVICE_NAME:-circana-alpha-evolve}"
+SERVICE_NAME="${SERVICE_NAME:-circana-alpha-evolve-pdi}"
 PROJECT_ID="${1:-${PROJECT_ID:-$(gcloud config get-value project 2>/dev/null || echo "shade-sandbox")}}"
 REGION="${2:-${REGION:-us-central1}}"
 

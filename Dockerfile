@@ -14,6 +14,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy AlphaEvolve experiment files and FastAPI web studio
 COPY .evolve/ ./.evolve/
 COPY initial_program.py evaluator.py problem_description.md example_evaluation.json ./
+COPY static/ ./static/
 COPY webapp/ ./webapp/
 
 ENV PORT=8080

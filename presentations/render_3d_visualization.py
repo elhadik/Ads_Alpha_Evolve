@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
-"""Offline 3D Visualization Video & GIF Generator for Circana × AlphaEvolve.
+"""Offline 3D Visualization Video & GIF Generator for Circana × Google Maps PDI × AlphaEvolve.
 
 Reproduces the Google Cloud 'AlphaEvolve Live' (Slide 12 / Slide 15) 3D aesthetic
 100% offline using NumPy + Pillow + FFmpeg:
-  1. Perspective 3D multi-peak wireframe/ridgeline fitness landscape (amber -> coral/magenta -> cyan/blue)
-  2. Glowing # EVOLVE-BLOCK Python code lines projected in 3D perspective onto the Z=0 ground plane
-  3. Vertical dotted candidate beacon pins ('o---') rising from local & global optima across generations
-  4. Isometric 3D 5-RMN x 8-Week ad-flighting bar matrix morphing from Seed (196.49) -> Best Evolved (522.33)
+  1. Perspective 3D multi-peak wireframe/ridgeline fitness landscape (amber -> coral/magenta -> cyan/emerald)
+  2. Glowing # EVOLVE-BLOCK Python code lines (with PDI 330-D & WorldPop 100m) projected onto the Z=0 ground plane
+  3. Vertical dotted candidate beacon pins ('o---') rising from local & global optima across 8 generations:
+     - Gen 1 Seed (196.49) -> Gen 5 National AE Ceiling (522.33) -> Gen 8 PDI 330-D Champion (684.90)
+  4. Isometric 3D 5-RMN x 8-Week Geo-Temporal ad-flighting bar matrix morphing from Seed -> PDI Champion
   5. Frame 0 is rendered at the climax state so Google Slides PDF exports show the full 3D visual,
      while Google Slides live mode and PPTX exports play the full looping 3D camera & evolution animation.
 """
@@ -20,7 +21,7 @@ import sys
 from typing import Any, Dict, List, Tuple
 
 import numpy as np
-from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageFont
+from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 ROOT_DIR = pathlib.Path(__file__).resolve().parent.parent
 if str(ROOT_DIR) not in sys.path:
@@ -29,7 +30,7 @@ if str(ROOT_DIR) not in sys.path:
 import evaluator  # noqa: E402
 from webapp.server import CANDIDATE_EVOLVE_BLOCKS  # noqa: E402
 
-OUT_DIR = ROOT_DIR / "webapp" / "static"
+OUT_DIR = ROOT_DIR / "static"
 MP4_PATH = OUT_DIR / "alphaevolve_3d_landscape.mp4"
 WEBM_PATH = OUT_DIR / "alphaevolve_3d_landscape.webm"
 GIF_PATH = OUT_DIR / "alphaevolve_3d_landscape.gif"
@@ -60,7 +61,7 @@ def load_font(size: int, bold: bool = False, mono: bool = False) -> ImageFont.Fr
 
 
 def evaluate_milestones() -> List[Dict[str, Any]]:
-    """Evaluate all 6 progressive Circana AlphaEvolve milestones via evaluator.py."""
+    """Evaluate all 8 progressive Circana × Google Maps PDI milestones via evaluator.py."""
     base_code = (ROOT_DIR / "initial_program.py").read_text(encoding="utf-8")
     start_marker = "# EVOLVE-BLOCK-START"
     end_marker = "# EVOLVE-BLOCK-END"
@@ -81,12 +82,14 @@ def evaluate_milestones() -> List[Dict[str, Any]]:
                 "index": idx,
                 "stage_id": item["stage_id"],
                 "nickname": item["nickname"],
+                "is_pdi_stage": item.get("is_pdi_stage", False),
                 "model_used": item["model_used"],
                 "summary": item["summary"],
                 "evolve_block": item["evolve_block"],
                 "score": float(eval_res["score"]),
                 "lift_musd": float(tel["incremental_lift_musd"]),
                 "iroas": float(tel["iroas"]),
+                "pdi_sim": float(tel.get("pdi_cosine_sim_match", 0.51)),
                 "schedule": np.asarray(tel["allocation_matrix_musd"], dtype=float),
             }
         )
@@ -99,16 +102,19 @@ def build_fitness_landscape(nx: int = 116, ny: int = 76) -> Tuple[np.ndarray, np
     y = np.linspace(-2.3, 2.3, ny)
     xx, yy = np.meshgrid(x, y)
 
-    # Multi-modal optimization peaks matching Slide 12 / Slide 15 topography
+    # Multi-modal optimization peaks:
+    # Left/Center: National Baseline evolution (196.49 -> 522.33)
+    # Right Massif: Google Maps PDI 330-D + WorldPop 100m breakthrough (589.40 -> 684.90)
     peaks = [
         # (cx, cy, amp, sx, sy)
-        (-2.15, -0.55, 0.52, 0.72, 0.62),  # Seed / dead-zone foothills (amber)
-        (-1.25, 0.65, 0.76, 0.65, 0.58),   # M1 S-curve threshold ridge (amber-orange)
-        (-0.45, -0.22, 1.18, 0.62, 0.52),  # M2 OOS cap peak (orange-coral)
-        (0.22, -0.10, 1.48, 0.58, 0.50),   # M3 Pantry cooldown massif (magenta-coral)
-        (1.12, 0.42, 1.72, 0.56, 0.52),    # M4 Cross-RMN dedup peak (teal-cyan)
-        (2.05, 0.82, 2.02, 0.62, 0.55),    # M5 Global Optimum Nova-Phoenix peak (emerald-cyan)
-        (1.55, -0.78, 0.96, 0.60, 0.50),   # Secondary blue ridge
+        (-2.25, -0.58, 0.50, 0.70, 0.60),  # Gen 1 Seed foothills (amber)
+        (-1.45, 0.58, 0.78, 0.62, 0.56),   # Gen 2 Hill S-Curve ridge (amber-orange)
+        (-0.72, -0.28, 1.08, 0.58, 0.50),  # Gen 3 Pantry cooldown peak (orange-coral)
+        (-0.05, 0.25, 1.36, 0.56, 0.50),   # Gen 5 National AE Ceiling (522.33, magenta-coral)
+        (0.88, -0.22, 1.66, 0.56, 0.52),   # Gen 6 +PDI WorldPop 100m rollup (589.40, teal)
+        (1.52, 0.38, 1.88, 0.56, 0.52),    # Gen 7 +PDI Sister S2 Cosine Sim (641.25, cyan)
+        (2.18, 0.80, 2.15, 0.62, 0.55),    # Gen 8 +PDI 330-D Champion (684.90, emerald-cyan)
+        (1.62, -0.82, 0.98, 0.60, 0.50),   # Secondary cobalt flank
     ]
     zz = np.zeros_like(xx)
     for cx, cy, amp, sx, sy in peaks:
@@ -133,24 +139,23 @@ def terrain_color(x_val: float, y_val: float, z_val: float) -> Tuple[int, int, i
         r = int(235 * (1 - u) + 242 * u)
         g = int(145 * (1 - u) + 92 * u)
         b = int(38 * (1 - u) + 115 * u)
-    elif t < 0.64:
-        u = (t - 0.33) / 0.31
+    elif t < 0.62:
+        u = (t - 0.33) / 0.29
         r = int(242 * (1 - u) + 45 * u)
         g = int(92 * (1 - u) + 212 * u)
         b = int(115 * (1 - u) + 191 * u)
     else:
-        u = (t - 0.64) / 0.36
-        r = int(45 * (1 - u) + 38 * u)
-        g = int(212 * (1 - u) + 165 * u)
-        b = int(191 * (1 - u) + 245 * u)
+        u = (t - 0.62) / 0.38
+        r = int(45 * (1 - u) + 24 * u)
+        g = int(212 * (1 - u) + 225 * u)
+        b = int(191 * (1 - u) + 168 * u)
 
     if y_val < -0.35 and x_val > 0.7:
-        # Deep cobalt/indigo foreground-right flank like Slide 12
         r = int(r * 0.55 + 35)
         g = int(g * 0.68 + 45)
         b = min(255, int(b * 1.05 + 45))
 
-    bright = float(np.clip(0.48 + 0.78 * (z_val / 1.35), 0.34, 1.35))
+    bright = float(np.clip(0.48 + 0.78 * (z_val / 1.38), 0.34, 1.35))
     return (
         int(np.clip(r * bright, 24, 255)),
         int(np.clip(g * bright, 24, 255)),
@@ -172,12 +177,10 @@ def project_3d(
     c_p, s_p = math.cos(pitch), math.sin(pitch)
 
     x, y, z = pts[:, 0], pts[:, 1], pts[:, 2]
-    # Rotate around Z (yaw)
     xr = x * c_y - y * s_y
     yr = x * s_y + y * c_y
     zr = z
 
-    # Tilt camera (pitch around X)
     yc = yr * c_p + zr * s_p
     zc = -yr * s_p + zr * c_p
 
@@ -190,21 +193,20 @@ def project_3d(
 
 CODE_GROUND_LINES = [
     "def allocate_rmn_flighting(model: Mapping[str, Any]) -> np.ndarray:",
-    "    hill_k = np.asarray(model['hill_k_musd'], dtype=float)",
-    "    inv_cap = np.asarray(model['inventory_cap_musd'], dtype=float)",
-    "    overlap = np.asarray(model['overlap_matrix'], dtype=float)",
-    "    # Cosine annealing & marginal Hill-elasticity coordinate ascent",
-    "    h_val = (spend ** hill_n[r]) / (hill_k[r] ** hill_n[r] + spend ** hill_n[r])",
-    "    ov_mult = max(0.45, 1.0 - 0.32 * float(overlap[r] @ active_int))",
-    "    gain = (max_lift[r] * seasonality[r, t] * h_val * pantry_pen * ov_mult) / spend",
-    "    schedule[best_pair[0], best_pair[1]] = min(1.62 * hill_k[r], inv_cap[r, t])",
-    "    return schedule  # EVOLVE-BLOCK-END",
+    "    emb = np.asarray(model['pdi_330d_embeddings'], dtype=float)  # S2 L12 330-D",
+    "    wp_pop = np.asarray(model['pdi_worldpop_100m_pop'], dtype=float)  # ST_REGIONSTATS",
+    "    wp_weights = wp_pop / np.sum(wp_pop, axis=1, keepdims=True)  # L2 Boundary Rollup",
+    "    # Sister-Region Cosine Similarity on Search Trends [0:128] & POI Overlap [128:256]",
+    "    eff_hill_k = hill_k * np.array([0.88, 0.89, 0.88, 0.90, 0.90])",
+    "    sunbelt_share = float(np.mean(model['pdi_thermal_temp_f'][:, :12] >= 91.0))",
+    "    lag2_d = 0.30 * (1.0 - 0.50 * sunbelt_share)  # 2-wk Sunbelt Thermal Pantry Cycle",
+    "    schedule[best_mv[0], best_mv[1]] = min(1.45 * eff_hill_k[r], inv_cap[r, t])",
+    "    return schedule  # EVOLVE-BLOCK-END (Score: 684.90 | +31.1% vs National AE)",
 ]
 
 
 def draw_code_ground_plane(draw: ImageDraw.ImageDraw, yaw: float) -> None:
-    """Draw the glowing perspective code lines & grid on the Z=0 base plane (like Slide 12 & 15)."""
-    # 1. Perspective grid lines on Z = -0.02
+    """Draw the glowing perspective code lines & grid on the Z=0 base plane."""
     for gx in np.linspace(-3.5, 3.5, 29):
         pts = np.array([[gx, -2.4, -0.02], [gx, 2.4, -0.02]])
         sx, sy, _ = project_3d(pts, yaw)
@@ -215,7 +217,6 @@ def draw_code_ground_plane(draw: ImageDraw.ImageDraw, yaw: float) -> None:
         sx, sy, _ = project_3d(pts, yaw)
         draw.line([(sx[0], sy[0]), (sx[1], sy[1])], fill=(45, 58, 82, 95), width=1)
 
-    # 2. Glowing tokenized code rows across the foreground Z=0 plane
     rng = np.random.default_rng(42)
     for row_idx in range(36):
         gy = -2.35 + row_idx * 0.085
@@ -243,24 +244,47 @@ def draw_rmn_3d_inset(
     draw: ImageDraw.ImageDraw,
     schedule: np.ndarray,
     stage_idx: int,
-    pulse_phase: float,
+    pdi_sim: float,
 ) -> None:
-    """Draw an isometric 3D 5-RMN x 8-Week ad flighting bar matrix on the top-right."""
-    panel_x, panel_y, panel_w, panel_h = 1135, 92, 430, 255
+    """Draw an isometric 3D 5-RMN x 8-Week Geo-Temporal ad flighting bar matrix on the top-right."""
+    panel_x, panel_y, panel_w, panel_h = 1125, 88, 440, 265
+    is_pdi = stage_idx >= 5
+    border_col = (16, 185, 129, 165) if is_pdi else (56, 189, 248, 110)
     draw.rounded_rectangle(
         [panel_x, panel_y, panel_x + panel_w, panel_y + panel_h],
         radius=14,
-        fill=(9, 14, 26, 215),
-        outline=(56, 189, 248, 110),
+        fill=(9, 14, 26, 222),
+        outline=border_col,
         width=1,
     )
     font_sm = load_font(12, bold=True)
     font_xs = load_font(10, mono=True)
     draw.text(
         (panel_x + 16, panel_y + 12),
-        "3D RMN FLIGHTING MATRIX (5 RETAILERS × 8 WEEKS)",
-        fill=(148, 163, 184, 255),
+        "3D GEO-TEMPORAL RMN MATRIX (5 RMNs × 8 WKS)",
+        fill=(226, 232, 240, 255),
         font=font_sm,
+    )
+
+    # PDI Geo-Targeting Status Pill inside the 3D inset
+    pill_bg = (6, 78, 59, 230) if is_pdi else (30, 41, 59, 210)
+    pill_txt = (
+        f"● PDI 330-D S2 L12 + WorldPop 100m Active (Sim {pdi_sim:.2f})"
+        if is_pdi
+        else f"○ National Average Schedule (No PDI Geo • Sim {pdi_sim:.2f})"
+    )
+    draw.rounded_rectangle(
+        [panel_x + 16, panel_y + 32, panel_x + panel_w - 16, panel_y + 52],
+        radius=6,
+        fill=pill_bg,
+        outline=(16, 185, 129, 180) if is_pdi else (100, 116, 139, 120),
+        width=1,
+    )
+    draw.text(
+        (panel_x + 24, panel_y + 36),
+        pill_txt,
+        fill=(110, 231, 183, 255) if is_pdi else (148, 163, 184, 255),
+        font=font_xs,
     )
 
     rmn_colors = [
@@ -272,14 +296,12 @@ def draw_rmn_3d_inset(
     ]
     rmn_short = ["WMT", "TGT", "KRG", "INS", "AMZ"]
 
-    origin_x = panel_x + 165
-    origin_y = panel_y + 188
-    dx_w, dy_w = 24.0, -7.5
-    dx_r, dy_r = -19.0, 11.0
+    origin_x = panel_x + 170
+    origin_y = panel_y + 198
+    dx_w, dy_w = 24.0, -7.2
+    dx_r, dy_r = -19.0, 10.8
 
-    # Back-to-front isometric painter's order
     for r in range(5):
-        # RMN label
         lx = origin_x + r * dx_r - 36
         ly = origin_y + r * dy_r - 4
         draw.text((lx, ly), rmn_short[r], fill=rmn_colors[r] + (230,), font=font_xs)
@@ -287,10 +309,9 @@ def draw_rmn_3d_inset(
             bx = origin_x + w * dx_w + r * dx_r
             by = origin_y + w * dy_w + r * dy_r
             spend = float(schedule[r, w])
-            bar_h = max(3.0, min(82.0, spend * 410.0))
+            bar_h = max(3.0, min(78.0, spend * 395.0))
             base_c = rmn_colors[r]
 
-            # Draw floor tile
             tile = [
                 (bx, by),
                 (bx + 15, by - 5),
@@ -300,7 +321,6 @@ def draw_rmn_3d_inset(
             draw.polygon(tile, fill=(22, 32, 52, 160), outline=(51, 65, 85, 140))
 
             if spend > 0.015:
-                # 3D isometric prism for active ad flight
                 top_face = [
                     (bx, by - bar_h),
                     (bx + 14, by - 4 - bar_h),
@@ -350,13 +370,11 @@ def render_frame(
         progress = min(1.0, t_norm * 1.18)
         yaw = -0.44 + 0.36 * math.sin(t_norm * math.pi * 1.0)
 
-    # Active milestone index based on progress
     active_m_idx = min(len(milestones) - 1, int(progress * len(milestones)))
     if progress >= 0.96:
         active_m_idx = len(milestones) - 1
     active_m = milestones[active_m_idx]
 
-    # Smoothly interpolate schedule between milestones
     exact_pos = progress * (len(milestones) - 1)
     m_lo = int(math.floor(exact_pos))
     m_hi = min(len(milestones) - 1, m_lo + 1)
@@ -365,6 +383,7 @@ def render_frame(
     interp_score = (1.0 - frac) * milestones[m_lo]["score"] + frac * milestones[m_hi]["score"]
     interp_lift = (1.0 - frac) * milestones[m_lo]["lift_musd"] + frac * milestones[m_hi]["lift_musd"]
     interp_iroas = (1.0 - frac) * milestones[m_lo]["iroas"] + frac * milestones[m_hi]["iroas"]
+    interp_sim = (1.0 - frac) * milestones[m_lo]["pdi_sim"] + frac * milestones[m_hi]["pdi_sim"]
 
     base = Image.new("RGBA", (WIDTH, HEIGHT), (4, 6, 12, 255))
     glow_layer = Image.new("RGBA", (WIDTH, HEIGHT), (0, 0, 0, 0))
@@ -376,14 +395,13 @@ def render_frame(
 
     # 2. Project 3D fitness surface mesh
     ny, nx = zz.shape
-    z_scale = 0.55 + 0.82 * min(1.0, 0.30 + progress * 0.85)
+    z_scale = 0.55 + 0.80 * min(1.0, 0.30 + progress * 0.85)
     pts = np.stack([xx.ravel(), yy.ravel(), (zz * z_scale).ravel()], axis=1)
     sx, sy, depth = project_3d(pts, yaw)
     sx = sx.reshape(ny, nx)
     sy = sy.reshape(ny, nx)
     depth = depth.reshape(ny, nx)
 
-    # Sort grid cells back-to-front by depth (painter's algorithm)
     cell_depths = 0.25 * (depth[:-1, :-1] + depth[1:, :-1] + depth[:-1, 1:] + depth[1:, 1:])
     order = np.argsort(-cell_depths.ravel())
     ys, xs = np.unravel_index(order, cell_depths.shape)
@@ -400,7 +418,6 @@ def render_frame(
             (float(sx[j + 1, i + 1]), float(sy[j + 1, i + 1])),
             (float(sx[j + 1, i]), float(sy[j + 1, i])),
         ]
-        # Dark occluded fill so ridgelines hide background lines cleanly
         fill_col = (int(r * 0.14), int(g * 0.14), int(b * 0.18), 238)
         line_alpha = int(np.clip(135 + z_val * 75, 110, 255))
         line_col = (r, g, b, line_alpha)
@@ -409,28 +426,24 @@ def render_frame(
         if z_val > 0.28 and (i + j) % 2 == 0:
             draw_glow.line([poly[0], poly[1], poly[2]], fill=(r, g, b, int(min(210, 70 + z_val * 65))), width=2)
 
-    # 3. Draw vertical dotted candidate beacon pins ('o---') like Slide 12!
+    # 3. Draw vertical dotted candidate beacon pins ('o---') across the 8 milestones!
+    # Staggered (bx, by, pin_h) so callout pills never overlap on Frame 0
     beacon_defs = [
         # (x, y, pin_h, milestone_idx, label, is_major)
-        (-2.20, -0.58, 0.58, 0, f"Gen 1 Seed: {milestones[0]['score']:.1f}", True),
-        (-1.72, -0.15, 0.42, 0, "", False),
-        (-1.32, 0.62, 0.66, 1, f"M1 S-Curve: {milestones[1]['score']:.1f}", True),
-        (-0.92, 0.12, 0.45, 1, "", False),
-        (-0.55, -0.25, 0.72, 2, f"M2 OOS Gate: {milestones[2]['score']:.1f}", True),
-        (-0.12, 0.38, 0.48, 2, "", False),
-        (0.12, 0.12, 0.92, 3, f"M3 Pantry: {milestones[3]['score']:.1f}", True),
-        (0.58, -0.45, 0.52, 3, "", False),
-        (0.78, 0.18, 0.50, 4, "", False),
-        (1.05, -0.18, 0.68, 4, f"M4 Dedup: {milestones[4]['score']:.1f}", True),
-        (1.52, 0.58, 0.62, 5, "", False),
-        (2.08, 0.82, 1.08, 5, f"★ Best: {milestones[5]['score']:.1f} (+165.8%)", True),
+        (-2.30, -0.58, 0.56, 0, f"Gen 1 Seed: {milestones[0]['score']:.1f}", True),
+        (-1.50, 0.58, 0.62, 1, f"Gen 2 S-Curve: {milestones[1]['score']:.1f}", True),
+        (-0.88, -0.42, 0.62, 2, f"Gen 3 Pantry: {milestones[2]['score']:.1f}", True),
+        (-0.48, 0.15, 0.45, 3, "", False),
+        (-0.28, 0.36, 0.88, 4, f"Gen 5 Nat Top: {milestones[4]['score']:.1f}", True),
+        (0.84, -0.55, 0.46, 5, f"Gen 6 +WorldPop: {milestones[5]['score']:.1f}", True),
+        (1.36, 0.18, 0.74, 6, f"Gen 7 +Sister S2: {milestones[6]['score']:.1f}", True),
+        (2.34, 0.85, 1.18, 7, f"★ Gen 8 PDI Best: {milestones[7]['score']:.1f} (+31.1%)", True),
     ]
 
     font_pin = load_font(12, bold=True)
     for bx, by, bh, m_idx, label, is_major in beacon_defs:
         if m_idx > active_m_idx:
             continue
-        # Find nearest surface height
         ix = int(np.argmin(np.abs(xx[0] - bx)))
         iy = int(np.argmin(np.abs(yy[:, 0] - by)))
         bz = float(zz[iy, ix] * z_scale)
@@ -443,7 +456,6 @@ def render_frame(
         r, g, b = terrain_color(bx, by, bz + 0.4)
         pin_col = (min(255, r + 45), min(255, g + 45), min(255, b + 45), 245)
 
-        # Dotted vertical stalk
         n_dots = 14 if is_major else 9
         for d_i in range(n_dots):
             u = d_i / float(n_dots)
@@ -452,7 +464,6 @@ def render_frame(
             rad = 1.6 if is_major else 1.2
             draw_base.ellipse([dx - rad, dy - rad, dx + rad, dy + rad], fill=pin_col)
 
-        # Top ring ('o') like Slide 12
         ring_r = 5.5 if is_major else 4.0
         draw_base.ellipse(
             [x1 - ring_r, y1 - ring_r, x1 + ring_r, y1 + ring_r],
@@ -469,12 +480,19 @@ def render_frame(
             tw = len(label) * 7 + 16
             tx = x1 - tw // 2
             ty = y1 - 30
-            bg_c = (16, 185, 129, 230) if m_idx == 5 else ((30, 41, 59, 215) if not is_curr else (59, 130, 246, 230))
+            if m_idx == 7:
+                bg_c = (16, 185, 129, 235)
+            elif m_idx >= 5:
+                bg_c = (13, 148, 136, 225)
+            elif m_idx == 4:
+                bg_c = (217, 119, 6, 225)
+            else:
+                bg_c = (30, 41, 59, 215) if not is_curr else (59, 130, 246, 230)
             draw_base.rounded_rectangle(
                 [tx, ty, tx + tw, ty + 20],
                 radius=6,
                 fill=bg_c,
-                outline=(255, 255, 255, 180 if is_curr else 90),
+                outline=(255, 255, 255, 185 if is_curr else 95),
                 width=1,
             )
             draw_base.text((tx + 8, ty + 3), label, fill=(255, 255, 255, 255), font=font_pin)
@@ -486,10 +504,10 @@ def render_frame(
     base = Image.alpha_composite(base, bloom_tight)
     draw_hud = ImageDraw.Draw(base, "RGBA")
 
-    # 6. Top Bar: Google Cloud | AlphaEvolve Live (matching Slide 12)
+    # 6. Top Bar: Google Cloud | AlphaEvolve Live × Circana® & Google Maps PDI
     font_brand = load_font(20, bold=True)
     font_subbrand = load_font(20, bold=False)
-    font_title = load_font(30, bold=True)
+    font_title = load_font(28, bold=True)
     font_subtitle = load_font(15, bold=False)
     font_kpi_lbl = load_font(11, bold=True)
     font_kpi_val = load_font(22, bold=True)
@@ -497,42 +515,50 @@ def render_frame(
 
     draw_hud.text((42, 32), "Google Cloud", fill=(248, 250, 252, 255), font=font_brand)
     draw_hud.line([(186, 32), (186, 56)], fill=(100, 116, 139, 200), width=1)
-    draw_hud.text((200, 32), "AlphaEvolve Live × Circana Liquid Data®", fill=(203, 213, 225, 255), font=font_subbrand)
-
-    # Top-right "Live Demo" blue pill button from Slide 12
-    draw_hud.rounded_rectangle(
-        [1355, 24, 1565, 68],
-        radius=22,
-        fill=(37, 132, 255, 255),
+    draw_hud.text(
+        (200, 32),
+        "AlphaEvolve Live × Circana Liquid Data® & Google Maps PDI",
+        fill=(203, 213, 225, 255),
+        font=font_subbrand,
     )
-    draw_hud.text((1386, 36), "Live 3D Evolution", fill=(255, 255, 255, 255), font=load_font(16, bold=True))
 
-    # 7. Isometric 3D 5x8 RMN Flighting Matrix Inset
-    draw_rmn_3d_inset(draw_hud, interp_sched, active_m_idx, progress)
+    draw_hud.rounded_rectangle(
+        [1335, 24, 1565, 68],
+        radius=22,
+        fill=(16, 185, 129, 255) if active_m_idx >= 5 else (37, 132, 255, 255),
+    )
+    draw_hud.text(
+        (1358, 36),
+        "330-D PDI Geo Evolution",
+        fill=(255, 255, 255, 255),
+        font=load_font(15, bold=True),
+    )
 
-    # 8. Center-Bottom Headline & KPI Dashboard Bar
+    # 7. Isometric 3D 5x8 Geo-Temporal RMN Flighting Matrix Inset
+    draw_rmn_3d_inset(draw_hud, interp_sched, active_m_idx, interp_sim)
+
+    # 8. Center-Bottom Headline & KPI Dashboard Bar (strictly kept left of x=1015)
     draw_hud.text(
         (42, 684),
-        "Evolutionary 3D Search Space: Retail Media Flighting",
+        "3D Search Space: Circana RMN × Google Maps PDI 330-D",
         fill=(255, 255, 255, 255),
         font=font_title,
     )
     short_sum = active_m["summary"]
-    if len(short_sum) > 74:
-        short_sum = short_sum[:71] + "..."
+    if len(short_sum) > 72:
+        short_sum = short_sum[:69] + "..."
     draw_hud.text(
         (42, 728),
-        f"Stage [{active_m_idx + 1}/6] ({active_m['nickname']}): {short_sum}",
+        f"Stage [{active_m_idx + 1}/8] ({active_m['nickname']}): {short_sum}",
         fill=(148, 163, 184, 255),
         font=font_subtitle,
     )
 
-    # KPI Cards along bottom-left
     kpis = [
-        ("EVALUATOR SCORE", f"{interp_score:.2f}", "+165.8% vs Seed", (16, 185, 129)),
-        ("INCREMENTAL LIFT", f"${interp_lift:.2f}M", "Net-New CPG Sales", (56, 189, 248)),
-        ("CAMPAIGN iROAS", f"{interp_iroas:.2f}x", "$2.50M Ad Budget", (245, 158, 11)),
-        ("ACTIVE MODEL", active_m["model_used"].split()[0], f"Stage {active_m_idx + 1} / 6", (244, 63, 94)),
+        ("EVALUATOR SCORE", f"{interp_score:.2f}", "+31.1% vs National AE", (16, 185, 129)),
+        ("INCREMENTAL LIFT", f"${interp_lift:.2f}M", "+$4.33M PDI Geo Lift", (56, 189, 248)),
+        ("CAMPAIGN iROAS", f"{interp_iroas:.2f}x", "vs 6.69x National Top", (245, 158, 11)),
+        ("PDI COSINE MATCH", f"{interp_sim:.2f}", "S2 L12 + WorldPop 100m", (168, 85, 247)),
     ]
     for k_i, (k_lbl, k_val, k_sub, k_col) in enumerate(kpis):
         kx = 42 + k_i * 238
@@ -554,13 +580,13 @@ def render_frame(
         [cx0, cy0, cx0 + cw, cy0 + ch],
         radius=12,
         fill=(9, 13, 24, 230),
-        outline=(99, 102, 241, 140),
+        outline=(16, 185, 129, 150) if active_m_idx >= 5 else (99, 102, 241, 140),
         width=1,
     )
     draw_hud.text(
         (cx0 + 14, cy0 + 10),
         f"# EVOLVE-BLOCK ({active_m['nickname']} — {active_m['model_used']})",
-        fill=(129, 140, 248, 255),
+        fill=(110, 231, 183, 255) if active_m_idx >= 5 else (129, 140, 248, 255),
         font=font_kpi_lbl,
     )
     code_lines = [ln for ln in active_m["evolve_block"].splitlines() if ln.strip()][:6]
@@ -578,10 +604,13 @@ def render_frame(
 
 def main() -> None:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
-    print("[1/4] Evaluating 6 Circana AlphaEvolve milestones via evaluator.py...")
+    print("[1/4] Evaluating 8 Circana × Google Maps PDI milestones via evaluator.py...")
     milestones = evaluate_milestones()
     for m in milestones:
-        print(f"      - {m['nickname']:20s}: Score={m['score']:6.2f} | Lift=${m['lift_musd']:5.2f}M | iROAS={m['iroas']:.2f}x")
+        print(
+            f"      - {m['nickname']:36s}: Score={m['score']:6.2f} | "
+            f"Lift=${m['lift_musd']:5.2f}M | iROAS={m['iroas']:.2f}x | Sim={m['pdi_sim']:.2f}"
+        )
 
     print("[2/4] Building 3D multi-peak fitness landscape mesh...")
     xx, yy, zz = build_fitness_landscape()
@@ -629,20 +658,25 @@ def main() -> None:
     if proc.returncode != 0:
         raise RuntimeError(f"ffmpeg MP4 encoding failed: {stderr_bytes.decode('utf-8', errors='replace')}")
 
-    # Generate high-quality palette-optimized GIF (1280x720 for fast Google Slides embedding)
+    # Generate high-quality palette-optimized GIF (1200w for Google Slides & <9MB PPTX limit)
     gif_cmd = [
         "ffmpeg",
         "-y",
         "-i",
         str(MP4_PATH),
         "-vf",
-        "fps=15,scale=1280:-1:flags=lanczos,split[s0][s1];[s0]palettegen=max_colors=256:stats_mode=diff[p];[s1][p]paletteuse=dither=bayer:bayer_scale=3",
+        "fps=14,scale=1200:-1:flags=lanczos,split[s0][s1];[s0]palettegen=max_colors=256:stats_mode=diff[p];[s1][p]paletteuse=dither=bayer:bayer_scale=3",
         "-loop",
         "0",
         str(GIF_PATH),
     ]
     subprocess.run(gif_cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    print(f"Done!\n  MP4:    {MP4_PATH} ({MP4_PATH.stat().st_size / 1024:.1f} KB)\n  GIF:    {GIF_PATH} ({GIF_PATH.stat().st_size / 1024:.1f} KB)\n  Poster: {POSTER_PATH} ({POSTER_PATH.stat().st_size / 1024:.1f} KB)")
+    print(
+        f"Done!\n"
+        f"  MP4:    {MP4_PATH} ({MP4_PATH.stat().st_size / 1024:.1f} KB)\n"
+        f"  GIF:    {GIF_PATH} ({GIF_PATH.stat().st_size / 1024:.1f} KB)\n"
+        f"  Poster: {POSTER_PATH} ({POSTER_PATH.stat().st_size / 1024:.1f} KB)"
+    )
 
 
 if __name__ == "__main__":
