@@ -35,6 +35,19 @@ The video below was captured live from the deployed application. It shows the 4 
 
 *Direct video assets in this repository: [`webapp/static/demo_walkthrough.mp4`](webapp/static/demo_walkthrough.mp4) • [`webapp/static/demo_walkthrough.webm`](webapp/static/demo_walkthrough.webm) • [`webapp/static/demo_walkthrough.gif`](webapp/static/demo_walkthrough.gif) • [`webapp/static/demo_poster.png`](webapp/static/demo_poster.png)*
 
+### 🌌 3D Evolutionary Search Space & Flighting Matrix Visualization (Slide-Ready Offline Render)
+
+Generated 100% offline via [`webapp/render_3d_visualization.py`](webapp/render_3d_visualization.py) (`NumPy` + `Pillow` + `ffmpeg`), this 3D visualization maps the `# EVOLVE-BLOCK` Python source code onto the `Z = 0` ground plane, projects the multi-peak non-convex fitness surface in 3D, lights up vertical beacon pins (`o---`) across all 6 evolved milestones (`Score: 196.49 → 522.33`, `+165.8%`), and animates the isometric `5 Retailers × 8 Weeks` ad-flighting matrix:
+
+<video src="webapp/static/alphaevolve_3d_landscape.mp4" poster="webapp/static/alphaevolve_3d_poster.png" controls autoplay loop muted playsinline width="100%">
+  <source src="webapp/static/alphaevolve_3d_landscape.mp4" type="video/mp4" />
+  <source src="webapp/static/alphaevolve_3d_landscape.webm" type="video/webm" />
+</video>
+
+![Circana × AlphaEvolve 3D Search Space & Flighting Matrix](webapp/static/alphaevolve_3d_landscape.gif)
+
+*Direct 3D video & slide assets in `webapp/static/`: [`webapp/static/alphaevolve_3d_landscape.mp4`](webapp/static/alphaevolve_3d_landscape.mp4) • [`webapp/static/alphaevolve_3d_landscape.webm`](webapp/static/alphaevolve_3d_landscape.webm) • [`webapp/static/alphaevolve_3d_landscape.gif`](webapp/static/alphaevolve_3d_landscape.gif) • [`webapp/static/alphaevolve_3d_poster.png`](webapp/static/alphaevolve_3d_poster.png) • [`circana_alphaevolve_executive_deck.pdf`](circana_alphaevolve_executive_deck.pdf)*
+
 ---
 
 ## 📚 Table of Contents
@@ -624,6 +637,7 @@ circan_alpha_evolve/
 ├── webapp/
 │   ├── __init__.py
 │   ├── server.py                     # FastAPI server driving real-time evaluator & GUI APIs
+│   ├── render_3d_visualization.py    # Offline 3D search-space & RMN matrix video/GIF generator
 │   └── static/
 │       ├── index.html                # Studio UI layout
 │       ├── styles.css                # Dark-mode executive theme
@@ -631,7 +645,11 @@ circan_alpha_evolve/
 │       ├── demo_walkthrough.mp4      # Recorded walkthrough video (H.264 MP4)
 │       ├── demo_walkthrough.webm     # Recorded walkthrough video (VP9 WebM)
 │       ├── demo_walkthrough.gif      # Animated GIF inline walkthrough preview
-│       └── demo_poster.png           # High-res poster frame
+│       ├── demo_poster.png           # High-res poster frame
+│       ├── alphaevolve_3d_landscape.mp4  # 3D Search Space & RMN Matrix video (H.264 MP4)
+│       ├── alphaevolve_3d_landscape.webm # 3D Search Space & RMN Matrix video (VP9 WebM)
+│       ├── alphaevolve_3d_landscape.gif  # 3D Search Space & RMN Matrix animated GIF
+│       └── alphaevolve_3d_poster.png     # 3D Search Space climax poster frame
 ├── initial_program.py                # Seed program with # EVOLVE-BLOCK-START / END
 ├── evaluator.py                      # 3-tier CLI & library evaluator (Validation -> Verification -> Evaluation)
 ├── problem_description.md            # Natural-language prompt context for AlphaEvolve LLMs
