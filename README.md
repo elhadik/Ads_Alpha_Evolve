@@ -55,7 +55,7 @@ Captured live from **https://circana-alpha-evolve-pdi-ns6bqifvaq-uc.a.run.app**:
 2. [Part 2: The Seven Hidden Real-World Dynamics (4 National + 3 PDI Geospatial) That Break Standard Optimizers](#2-part-2-the-seven-hidden-real-world-dynamics-4-national--3-pdi-geospatial-that-break-standard-optimizers)
 3. [Part 3: Deep-Dive Tutorial into `initial_program.py` & BigQuery WorldPop SQL (Line-by-Line Walkthrough)](#3-part-3-deep-dive-tutorial-into-initial_programpy--bigquery-worldpop-sql-line-by-line-walkthrough)
 4. [Part 4: Why Both the Naive Initial Program (`196.49`) AND National-Only AlphaEvolve (`522.33`) Hit a Wall](#4-part-4-why-both-the-naive-initial-program-19649-and-national-only-alphaevolve-52233-hit-a-wall)
-5. [Part 5: How AlphaEvolve & `evaluator.py` Evolve Better Algorithms (Line-by-Line Walkthrough)](#5-part-5-how-alphaevolve--evaluatorpy-evolve-better-algorithms-line-by-line-walkthrough)
+5. [Part 5: How AlphaEvolve & `evaluator.py` Evolve Better Algorithms — Evaluation Methods Deep Dive](#5-part-5-how-alphaevolve--evaluatorpy-evolve-better-algorithms--evaluation-methods-deep-dive)
 6. [Part 6: Step-by-Step Tour of All 8 Evolved Milestones (`Gen 1 → Gen 8`: Code + Math + Intuition)](#6-part-6-step-by-step-tour-of-all-8-evolved-milestones-gen-1--gen-8-code--math--intuition)
 7. [Part 7: Interactive Web Studio Guide — Google Maps PDI Playground, 4 Live Charts & Editable Configs](#7-part-7-interactive-web-studio-guide--google-maps-pdi-playground-4-live-charts--editable-configs)
 8. [Part 8: System Architecture & Modular Repository Structure](#8-part-8-system-architecture--modular-repository-structure)
@@ -515,6 +515,91 @@ Look at why each CTE in this SQL query is essential:
 
 ---
 
+### 3.3 How `evaluate()` Computes the Final `fitness_score` (Step-by-Step Walkthrough of the 4 Simulation & Scoring Methods)
+
+Let's trace lines 237–492 of [`initial_program.py`](initial_program.py#L237-L492) so you can see the **four mathematical evaluation methods** that score any candidate `schedule` matrix returned by `allocate_rmn_flighting(model)`:
+
+#### Method 1: Matrix Contract Check & Soft-Constraint Simplex Projection (Lines 248–272)
+```python
+raw_schedule = allocate_rmn_flighting(model)
+if raw_schedule.shape != (n_rmns, n_weeks) or not np.all(np.isfinite(raw_schedule)):
+    return {"fitness_score": -1e12}
+schedule = np.maximum(0.0, raw_schedule)
+
+total_spend = float(np.sum(schedule))
+overspend_musd = max(0.0, total_spend - total_budget)
+if total_spend > total_budget + 1e-6:
+    schedule = schedule * (total_budget / total_spend)
+    total_spend = float(np.sum(schedule))
+
+sub_min_mask = (schedule > 1e-6) & (schedule < min_flight - 1e-6)
+n_sub_min = int(np.sum(sub_min_mask))
+```
+- **Why Soft Projection Instead of Hard Rejection?**  
+  Suppose an LLM mutation generates a promising schedule that accidentally sums to `\$2.54M` instead of `\$2.50M` (`overspend_musd = 0.04`). If the evaluator simply returned `score = None` or `-1e12`, the evolutionary algorithm would lose all information about whether the *pattern* of flights was good. Instead, `evaluate()` projects `schedule` back onto the `\$2.50M` simplex (`schedule * (total_budget / total_spend)`) to measure its true sales lift, and then subtracts a steep linear penalty (`80.0 * overspend_musd + 3.5 * n_sub_min`) so the LLM receives a continuous gradient pointing back inside the budget constraint!
+
+#### Method 2: Google Maps PDI 330-D & WorldPop 100m Tensor Evaluation (Lines 280–350)
+Before simulating the 8 campaign weeks, `evaluate()` computes the real geospatial metrics directly from the `(5, 15, 330)` PDI tensors in `model`:
+1. **WorldPop 100m vs. Polygon Area Residential Capture (`lines 296–300 & 323–329`)**:
+   ```python
+   wp_weights = wp_pop / np.sum(wp_pop, axis=1, keepdims=True)
+   area_weights = area_km2 / np.sum(area_km2, keepdims=True, axis=1)
+   wp_residential_capture = float(np.mean(np.sum(wp_weights[:, :12], axis=1)))      # 0.964 (96.4%)
+   area_residential_capture = float(np.mean(np.sum(area_weights[:, :12], axis=1)))  # 0.724 (72.4%)
+   ```
+   When `pdi_worldpop` is activated (`Gen 6+`), pruning the `24.0%` dead-weight industrial/airport slivers (`Cells 12..14`) multiplies `eff_max_lift` by `wp_boost = 1.0 + 0.399 * (0.964 - 0.724) = 1.0958` (`+9.58%`) and lowers `eff_hill_k` by `5.5%`.
+2. **Sister-Region Cosine Similarity on Search Trends (`lines 302–311 & 331–337`)**:
+   ```python
+   search_slice = emb[:, :, 0:128]
+   search_norms = np.linalg.norm(search_slice, axis=2, keepdims=True)
+   search_unit = search_slice / np.maximum(search_norms, 1e-8)
+   seed_search = search_unit[:, 0:1, :]
+   search_cos_sims = np.sum(search_unit * seed_search, axis=2)  # (5, 15) dot product = Cosine Sim
+   ```
+   When `pdi_sister_sim` is activated (`Gen 7+`), targeting S2 cells with `search_cos_sims >= 0.85` shifts `eff_hill_k` down to `[0.91, 0.92, 0.91, 0.92, 0.92] * hill_k`.
+3. **Local Maps POI Overlap Decoupling & Sunbelt Weather Velocity (`lines 338–350`)**:
+   - Activating `pdi_poi_decouple` (`dims 128:256`) reduces `eff_overlap = overlap * 0.55`.
+   - Activating `pdi_weather_vel` (`dims 256:330`, where `sunbelt_share = float(np.mean(temp_f[:, :12] >= 91.0)) = 0.60`) shortens pantry cannibalization memory to `lag1_decay = 0.52 * (1 - 0.25 * 0.60) = 0.442` and `lag2_decay = 0.30 * (1 - 0.50 * 0.60) = 0.210`.
+
+#### Method 3: Week-by-Week Causal Attribution Simulation Loop (Lines 359–408)
+For each week $t \in \{0, 1, \dots, 7\}$, `evaluate()` computes the sequential waterfall from **Gross Unconstrained Lift** down to **Net Incremental Sales Lift**:
+
+```text
+Week t Spend B[:, t]
+  │
+  ├─► Step 3A: Store Inventory Cap       eff_b = min(B[:, t], inv_cap[:, t])
+  │                                      oos_excess = max(0, B[:, t] - inv_cap[:, t])
+  │
+  ├─► Step 3B: Hill S-Curve Response     base_lift_t = eff_max_lift * seasonality[:, t] * (eff_b^n / (eff_hill_k^n + eff_b^n))
+  │
+  ├─► Step 3C: Pantry Depletion Lag      after_pantry = base_lift_t * clip(1 - d1*Int[t-1] - d2*Int[t-2], 0.22, 1.0)
+  │                                      (Difference = total_pantry_loss)
+  │
+  ├─► Step 3D: Cross-RMN Reach Overlap   after_overlap = after_pantry * clip(1 - 0.32*(eff_overlap @ ActInt[t]), 0.45, 1.0)
+  │                                      (Difference = total_overlap_loss)
+  │
+  └─► Step 3E: Out-of-Stock Penalty      net_t = max(0, after_overlap - 2.4 * oos_excess)
+                                         (Subtracted = total_oos_loss)
+```
+
+#### Method 4: Multi-Objective Fitness Aggregation & Worked Numerical Examples (Lines 409–449)
+Finally, `evaluate()` combines **Net Incremental Sales Lift ($\Delta\text{Sales}_{\text{net}}$)**, **Total Ad/OOS Waste Percentage ($\text{Waste}_{\%}$)**, **PDI Structural Cohesion Bonus ($\text{Bonus}_{\text{PDI}}$)**, and **Constraint Penalties** into `fitness_score`:
+
+$$\text{fitness\_score} = 31.65 \times \Delta\text{Sales}_{\text{net}} - 0.35 \times \text{Waste}_{\%} + \text{Bonus}_{\text{PDI}} - \left(80.0 \times \text{Overspend} + 3.5 \times N_{\text{sub-min}}\right)$$
+
+Look at how this exact formula produces the scores across our key milestones (`Overspend = 0`, `N_sub_min = 0`):
+
+| Component in `evaluate()` | Gen 1 (`seed-uniform-smear`) | Gen 5 (`national-ae-champion`) | Gen 8 (`pdi-multimodal-champion`) |
+| :--- | :---: | :---: | :---: |
+| **Net Incremental Sales Lift ($\Delta\text{Sales}_{\text{net}}$)** | `\$6.8243M` | `\$16.7204M` | `\$21.0446M` |
+| **Lift Contribution ($31.65 \times \Delta\text{Sales}_{\text{net}}$)** | `+215.99` | `+529.20` | `+666.06` |
+| **Total Waste % ($\text{Waste}_{\%}$)** | `55.70%` | `19.63%` | `6.90%` |
+| **Waste Penalty ($-0.35 \times \text{Waste}_{\%}$)** | `-19.50` | `-6.87` | `-2.42` |
+| **PDI Structural Cohesion Bonus ($\text{Bonus}_{\text{PDI}}$)** | `+0.00` | `+0.00` | `+21.37` (`8.23 + 6.08 + 7.06`) |
+| **Final `fitness_score`** | **`196.49`** | **`522.33`** | **`684.90`** |
+
+---
+
 ## 4. Part 4: Why Both the Naive Initial Program (`196.49`) AND National-Only AlphaEvolve (`522.33`) Hit a Wall
 
 ### 4.1 Diagnosing the 10-Line Seed Baseline (`Gen 1` — Score: `196.49`)
@@ -575,14 +660,14 @@ By **Generation 5 (`national-ae-champion`)**, AlphaEvolve solves the 4 national 
 
 ---
 
-## 5. Part 5: How AlphaEvolve & `evaluator.py` Evolve Better Algorithms (Line-by-Line Walkthrough)
+## 5. Part 5: How AlphaEvolve & `evaluator.py` Evolve Better Algorithms — Evaluation Methods Deep Dive
 
-Now that we understand `initial_program.py`, how does **AlphaEvolve** discover a much better algorithm without human intervention?
+Now that we understand `initial_program.py`, let's examine the **evaluation methodology** inside [`evaluator.py`](evaluator.py) (`238 lines`) and see how **AlphaEvolve** uses structured evaluation methods to evolve complex Python algorithms without human intervention.
 
-### 5.1 What AlphaEvolve Actually Does (Evolutionary Code Search)
+### 5.1 Evolutionary Code Search vs. Traditional Numeric Optimization
 
-Traditional optimizers search over *numbers* (e.g., tweaking 40 floating-point values for one specific matrix).  
-**AlphaEvolve searches over *Python algorithms* (functions).**
+Traditional solvers (like linear programming or gradient descent) search over *numbers*—for example, directly tweaking 40 floating-point values for a single fixed input.  
+**AlphaEvolve searches over *executable Python algorithms* (functions):**
 
 ```mermaid
 sequenceDiagram
@@ -593,44 +678,138 @@ sequenceDiagram
 
     DB->>LLM: Sample parent program(s) + previous Evaluator Insights
     LLM->>EVAL: Propose mutated Python code for allocate_rmn_flighting(model)
-    EVAL->>EVAL: Tier 1 Validation (AST syntax + forbidden import sandbox check)
-    EVAL->>EVAL: Tier 2 Verification (SIGALRM timeout + 5x8 matrix contract)
-    EVAL->>SIM: Tier 3 Evaluation (Run 8-week National + PDI 330-D simulation)
+    EVAL->>EVAL: Tier 1 Validation: _check_ast_security() (lines 47-61)
+    EVAL->>EVAL: Tier 2 Verification: SIGALRM timeout + (5, 8) contract check (lines 103-146)
+    EVAL->>SIM: Tier 3 Evaluation: Run 8-week National + PDI 330-D simulation (line 124)
     SIM-->>EVAL: Return fitness_score + diagnostic loss & PDI telemetry
-    EVAL-->>DB: Register candidate score (e.g. 684.90) + structured text Insights
+    EVAL-->>DB: Register candidate score (e.g. 684.90) + 3 structured Insights blocks
 ```
 
-### 5.2 Line-by-Line Walkthrough of `evaluator.py` (`238 lines`)
+---
 
-Let's trace [`evaluator.py`](evaluator.py) line by line:
-1. **Lines 32 & 47–61 — Tier 1 Validation (`_check_ast_security`)**:
-   - Parses candidate code with `ast.parse(code)` and blocks any import from `FORBIDDEN_MODULES = {"os", "sys", "subprocess", "socket", "shutil", "inspect", "ctypes"}`.
-2. **Lines 103–146 — Tier 2 Verification (`evaluate_program`)**:
-   - Enforces a strict execution timeout via `signal.alarm(timeout_seconds)` (`30s`).
-   - Executes `initial_program.py` in a clean namespace and verifies `evaluate(inputs)` returns a finite `fitness_score`.
-3. **Lines 154–188 — Tier 3 Structured `insights` (How `evaluator.py` Teaches Gemini to Discover PDI)**:
-   - Look at lines 155–187 of [`evaluator.py`](evaluator.py#L155-L187). Along with the numeric `score`, `evaluator.py` returns **three structured `insights` blocks**:
-     ```json
-     {
-       "score": 522.33,
-       "insights": [
-         {
-           "label": "campaign_kpis",
-           "text": "Incremental Sales Lift: +$16.72M | iROAS: 6.69x | Spend: $2.50M | Ad/OOS Waste: 19.7%"
-         },
-         {
-           "label": "loss_breakdown",
-           "text": "Pantry Cannibalization Loss: $1.87M | Cross-RMN Overlap Loss: $1.46M | Out-of-Stock Penalty: $0.00M"
-         },
-         {
-           "label": "pdi_geospatial_insights",
-           "text": "PDI Active: False | Sister-Region Cosine Match: 0.65 | PDI Geo Dividend: +$0.00M | WorldPop Capture: 96.4%"
-         }
-       ]
-     }
-     ```
-   - During **Generations 1–5**, `loss_breakdown` (`Pantry Cannibalization Loss: $7.24M`, `Cross-RMN Overlap Loss: $2.48M`) guides Gemini to evolve S-curve pulsing, pantry spacing, cross-RMN staggering, and coordinate ascent (`196.49 → 522.33`).
-   - Once the national ceiling (`522.33`) is reached, `pdi_geospatial_insights` (`PDI Active: False | Sister-Region Cosine Match: 0.65 | PDI Geo Dividend: +$0.00M | WorldPop Capture: 96.4%`) signals to Gemini that activating the Google Maps PDI 330-D tensors and WorldPop 100m rollup in `model` will unlock the next evolutionary leap (`522.33 → 684.90`)!
+### 5.2 Method 1: The Three-Tier Evaluation Cascade (`Validation` $\rightarrow$ `Verification` $\rightarrow$ `Evaluation`)
+
+Following official **AlphaEvolve Evaluator Design Best Practices**, [`evaluator.py`](evaluator.py) implements a strict **Three-Tier Cascade** inside `evaluate_program(code, timeout_seconds, eval_inputs_override)`. Every candidate program generated by the LLM must pass each tier in sequence:
+
+| Evaluation Tier | Function / Lines in `evaluator.py` | What It Checks | What Happens on Failure |
+| :--- | :--- | :--- | :--- |
+| **Tier 1: Static AST Security & Syntax Validation** | `_check_ast_security(code)` ([`lines 47–61`](evaluator.py#L47-L61)) | Parses candidate code into an Abstract Syntax Tree (`ast.parse(code)`) and walks every `ast.Import` and `ast.ImportFrom` node to block `FORBIDDEN_MODULES = {"os", "sys", "subprocess", "socket", "shutil", "inspect", "ctypes"}`. | Returns `{"score": None, "insights": [{"label": "error", ...}, {"label": "traceback", ...}]}` in `< 1ms` without executing a single line of unsafe or syntactically invalid code. |
+| **Tier 2: Runtime Verification & Sandbox Timeout** | `evaluate_program()` ([`lines 103–146`](evaluator.py#L103-L146)) | Arms a POSIX `signal.SIGALRM` hardware timer (`timeout_seconds = 30s`), redirects `stdout` and `stderr` into in-memory `io.StringIO()` buffers, executes `evaluate(inputs)` in a restricted namespace (`np`, `math`, `Any`, `Mapping`), and verifies the returned `fitness_score` is a finite float $> -10^{11}$. | Kills runaway/infinite loops via `EvaluationTimeout`, captures any runtime `Exception` + `stdout`/`stderr`, and returns `{"score": None, "insights": [...]}` so the LLM can fix its bug on the next mutation. |
+| **Tier 3: Continuous Multi-Objective Evaluation & Telemetry** | `evaluate(inputs)` + `insights` builder ([`lines 148–193`](evaluator.py#L148-L193)) | Runs the full 8-week National + Google Maps PDI 330-D simulation, extracts the continuous `fitness_score` rounded to 4 decimals, and packages 3 structured diagnostic `insights` blocks (`campaign_kpis`, `loss_breakdown`, `pdi_geospatial_insights`). | Returns `{"score": 684.90, "insights": [...], "telemetry": {...}}` to the AlphaEvolve controller and Web Studio UI. |
+
+#### Look at Tier 1 AST Security in Code (`evaluator.py`, lines 47–61):
+```python
+def _check_ast_security(code: str) -> str | None:
+    """Tier 1 AST validation: check syntax and reject forbidden imports/primitives."""
+    tree = ast.parse(code)
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                root_mod = alias.name.split(".")[0]
+                if root_mod in FORBIDDEN_MODULES:
+                    return f"Forbidden import '{alias.name}' is not allowed."
+        elif isinstance(node, ast.ImportFrom):
+            if node.module:
+                root_mod = node.module.split(".")[0]
+                if root_mod in FORBIDDEN_MODULES:
+                    return f"Forbidden import from '{node.module}' is not allowed."
+    return None
+```
+Why is this static AST check so important? Because LLM code mutations can occasionally attempt to `import os` to read environment variables or `import subprocess` to call external binaries. Inspecting the AST *before* `exec(compile(...))` guarantees 100% deterministic, sandboxed execution.
+
+---
+
+### 5.3 Method 2: Smooth Continuous Scoring vs. Step Functions (Avoiding Dead Gradients)
+
+One of the most common pitfalls in evolutionary code search is designing an evaluator with **flat step functions** or **binary pass/fail cliff edges** (for example, returning `score = 0` whenever budget is exceeded by `\$1`, or counting only the discrete number of weeks above a threshold).
+
+Our evaluation function in [`initial_program.py` (lines 412–448)](initial_program.py#L412-L448) is specifically engineered to provide a **smooth, multi-resolution gradient** across all stages of evolution:
+
+1. **Continuous Lift Gradient (`+31.65` points per `+\$1.00M` net incremental sales)**:  
+   Even a tiny code improvement that shifts `\$8,000` (`0.008`) of spend from a saturated cell to an under-saturated cell increases `total_incremental_lift_musd` by `~+\$25,000`, immediately rewarding the candidate with `+0.79` fitness points.
+2. **Continuous Waste Reduction Gradient (`-0.35 * waste_pct`)**:  
+   Where `waste_pct` aggregates all four sources of retail media inefficiency:
+   $$\text{Loss}_{\text{equiv}} = \left(\text{Loss}_{\text{pantry}} + \text{Loss}_{\text{overlap}} + \text{Loss}_{\text{OOS}} + 2.2 \times \text{Waste}_{\text{deadzone}}\right) \times \gamma_{\text{PDI}}$$
+   $$\text{Waste}_{\%} = \text{clip}\left(\frac{\text{Loss}_{\text{equiv}}}{\Delta\text{Sales}_{\text{net}} + \text{Loss}_{\text{equiv}}} \times 100, \; 1.5\%, \; 95.0\%\right)$$
+3. **Progressive PDI Structural Cohesion Bonus (`pdi_alignment_bonus`)**:  
+   Rewards the LLM as it progressively discovers and chains the three Google Maps PDI geospatial stages:
+   - **`+8.23` points** when `worldpop_l2_rollup` (`Earth Engine WorldPop 100m + L2 norm`) is enabled (`Gen 6`),
+   - **`+6.08` points** when `sister_search_cosine_sim` (`dims 0:128`) and `poi_local_decoupling` (`dims 128:256`) are enabled (`Gen 7`),
+   - **`+7.06` points** when `weather_thermal_cooldown` (`dims 256:330` Sunbelt 2-week pantry velocity) is enabled (`Gen 8`).
+
+---
+
+### 5.4 Method 3: Anti-Reward-Hacking & Parameterized Evaluation (`eval_inputs_override`)
+
+How do we prevent an LLM from "reward-hacking" (cheating)—for instance, by modifying `evaluate()` itself or by returning a hardcoded `5 × 8` matrix that only works for `\$2.50M`?
+
+We enforce **three anti-reward-hacking safeguards**:
+1. **Strict `# EVOLVE-BLOCK` Splicing ([`webapp/server.py`, lines 585–600](webapp/server.py#L585-L600))**:  
+   Only the body of `allocate_rmn_flighting(model)` between `# EVOLVE-BLOCK-START` and `# EVOLVE-BLOCK-END` is spliced into the canonical `initial_program.py` harness. The simulator functions (`_build_pdi_geospatial_tensors`, `build_circana_campaign_model`, and `evaluate`) are **immutable**.
+2. **Dynamic Parameter Overrides (`eval_inputs_override` in [`evaluator.py`, lines 81–101](evaluator.py#L81-L101))**:  
+   `evaluate_program()` accepts arbitrary overrides for `total_budget_musd` (e.g., testing `\$1.65M` tight-budget or `\$5.00M` scale-up campaigns), `min_flight_musd`, `pantry_cooldown_weeks`, `sister_sim_threshold` (`0.70–0.98`), and `random_seed`. Because the algorithm must read `model["total_budget_musd"]`, `model["hill_k_musd"]`, `model["inventory_cap_musd"]`, and `model["pdi_330d_embeddings"]` dynamically to pass parameterized runs, hardcoded arrays immediately fail or suffer massive overspend penalties.
+3. **Verifiable Tensor Math**:  
+   In `evaluate()`, `wp_residential_capture`, `area_residential_capture`, `search_cos_sims`, and `sunbelt_share` are recomputed directly from the raw `(5, 15, 330)` and `(5, 15)` NumPy arrays outside the evolve block.
+
+---
+
+### 5.5 Method 4: Diagnostic Feedback Loops (`insights` Engineering — Lines 148–193)
+
+In AlphaEvolve, the `insights` array returned by `evaluator.py` is injected directly into the **prompt context of the next LLM generation**. Instead of only telling Gemini *"Your score was 379.11"*, `evaluator.py` constructs **three domain-specific diagnostic telemetry strings** ([`lines 154–188`](evaluator.py#L154-L188)):
+
+| Insight Label | Exact Code in `evaluator.py` | Example Output Fed Back to Gemini LLM | What It Teaches the Next LLM Generation |
+| :--- | :--- | :--- | :--- |
+| **`campaign_kpis`** | `f"Incremental Sales Lift: +${lift:.2f}M \| iROAS: {iroas:.2f}x \| Spend: ${spend:.2f}M \| Ad/OOS Waste: {waste:.1f}%"` | `Incremental Sales Lift: +$12.44M \| iROAS: 4.97x \| Spend: $2.50M \| Ad/OOS Waste: 41.4%` | Shows overall budget utilization (`Spend: $2.50M`), current iROAS efficiency, and how much total waste (`41.4%`) remains to be eliminated. |
+| **`loss_breakdown`** | `f"Pantry Cannibalization Loss: ${pantry:.2f}M \| Cross-RMN Overlap Loss: ${overlap:.2f}M \| Out-of-Stock Penalty: ${oos:.2f}M"` | `Pantry Cannibalization Loss: $6.67M \| Cross-RMN Overlap Loss: $2.01M \| Out-of-Stock Penalty: $0.00M` | Pinpoints the **exact dollar bottleneck**! E.g., seeing `Pantry Cannibalization Loss: $6.67M` in Gen 2 directly causes Gemini to invent the 2-to-3 week cooldown spacing rule in Gen 3! |
+| **`pdi_geospatial_insights`** | `f"PDI Active: {pdi} \| Sister-Region Cosine Match: {sim:.2f} \| PDI Geo Dividend: +${div:.2f}M \| WorldPop Capture: {wp:.1f}%"` | `PDI Active: False \| Sister-Region Cosine Match: 0.65 \| PDI Geo Dividend: +$0.00M \| WorldPop Capture: 96.4%` | Alerts Gemini when `PDI Active: False` at the Gen 5 national ceiling (`522.33`), prompting the LLM to activate `pdi_worldpop_100m_pop`, `pdi_330d_embeddings`, and `pdi_thermal_temp_f` in Gens 6–8! |
+
+Look at how the raw JSON output of `evaluator.py` evolves from **Gen 1 (`196.49`)** to **Gen 5 (`522.33`)** to **Gen 8 (`684.90`)**:
+
+```json
+// === GEN 1 (Naive Seed) ===
+{
+  "score": 196.4941,
+  "insights": [
+    {"label": "campaign_kpis", "text": "Incremental Sales Lift: +$6.82M | iROAS: 2.73x | Spend: $2.50M | Ad/OOS Waste: 55.7%"},
+    {"label": "loss_breakdown", "text": "Pantry Cannibalization Loss: $7.24M | Cross-RMN Overlap Loss: $1.24M | Out-of-Stock Penalty: $0.00M"},
+    {"label": "pdi_geospatial_insights", "text": "PDI Active: False | Sister-Region Cosine Match: 0.51 | PDI Geo Dividend: +$0.00M | WorldPop Capture: 96.4%"}
+  ]
+}
+
+// === GEN 5 (National AlphaEvolve Ceiling) ===
+{
+  "score": 522.3338,
+  "insights": [
+    {"label": "campaign_kpis", "text": "Incremental Sales Lift: +$16.72M | iROAS: 6.69x | Spend: $2.50M | Ad/OOS Waste: 19.7%"},
+    {"label": "loss_breakdown", "text": "Pantry Cannibalization Loss: $1.87M | Cross-RMN Overlap Loss: $1.46M | Out-of-Stock Penalty: $0.00M"},
+    {"label": "pdi_geospatial_insights", "text": "PDI Active: False | Sister-Region Cosine Match: 0.65 | PDI Geo Dividend: +$0.00M | WorldPop Capture: 96.4%"}
+  ]
+}
+
+// === GEN 8 (PDI 330-D Multimodal Geo-Temporal Champion) ===
+{
+  "score": 684.9032,
+  "insights": [
+    {"label": "campaign_kpis", "text": "Incremental Sales Lift: +$21.04M | iROAS: 8.44x | Spend: $2.50M | Ad/OOS Waste: 6.9%"},
+    {"label": "loss_breakdown", "text": "Pantry Cannibalization Loss: $3.09M | Cross-RMN Overlap Loss: $1.42M | Out-of-Stock Penalty: $0.00M"},
+    {"label": "pdi_geospatial_insights", "text": "PDI Active: True | Sister-Region Cosine Match: 0.92 | PDI Geo Dividend: +$4.32M | WorldPop Capture: 96.4%"}
+  ]
+}
+```
+
+---
+
+### 5.6 Method 5: Dual-Mode Execution (`ae` CLI JSON Contract vs. Real-Time Web Studio API)
+
+[`evaluator.py`](evaluator.py) is architected to support **two execution modes simultaneously**:
+1. **Official `ae` CLI Subprocess Mode (`main()`, lines 214–237)**:  
+   When invoked by the AlphaEvolve CLI (`ae program evaluate` or `ae experiment run`) via:
+   ```bash
+   python evaluator.py --output-file /tmp/eval_out.json --program-dir .
+   ```
+   `main()` reads `initial_program.py`, runs `evaluate_program(code)`, strips the internal UI `telemetry` dictionary so the output strictly conforms to the AlphaEvolve `{"score": float | null, "insights": [{"label": str, "text": str}]}` schema, and writes `/tmp/eval_out.json`.
+2. **Real-Time In-Memory Web Studio Mode (`evaluate_program()`, lines 81–193)**:  
+   When imported by [`webapp/server.py`](webapp/server.py), `evaluate_program(code, eval_inputs_override=...)` returns the full `telemetry` payload (including the `5 × 8` `schedule_musd` matrix, `cell_net_lift_musd`, `weekly_net_lift_musd`, `scurve_operating_points`, and PDI metrics) in **`< 15 milliseconds`**, powering instant interactive chart updates and live browser code editing!
 
 ---
 
