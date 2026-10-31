@@ -40,8 +40,16 @@ Generated 100% offline via [`presentations/render_3d_visualization.py`](presenta
 
 *Direct 3D video & slide assets in [`static/`](static/): [`static/alphaevolve_3d_landscape.mp4`](static/alphaevolve_3d_landscape.mp4) • [`static/alphaevolve_3d_landscape.gif`](static/alphaevolve_3d_landscape.gif) • [`static/alphaevolve_3d_poster.png`](static/alphaevolve_3d_poster.png) • [`presentations/circana_pdi_alphaevolve_executive_deck.pdf`](presentations/circana_pdi_alphaevolve_executive_deck.pdf)*
 
-### 2. Live Deployed Web Studio: Google Maps PDI S2 Playground & 4 Dynamic Charts
-Captured live from **https://circana-alpha-evolve-pdi-ns6bqifvaq-uc.a.run.app**:
+### 2. Live Deployed Web Studio: End-to-End Cloud Run Video Walkthrough & Screenshots
+Captured live from **https://circana-alpha-evolve-pdi-ns6bqifvaq-uc.a.run.app** — stepping through all **8 evolutionary milestones (`Gen 1 → Gen 8`)**, exploring the **Google Maps PDI S2 Level 12 & WorldPop 100m Playground** across all 5 US Metro Hubs (`DFW`, `ORD`, `ATL`, `PHX`, `SEA`), animating the **6 synchronized optimization & ablation charts**, and inspecting the **live `# EVOLVE-BLOCK` Python code, BigQuery GIS `ST_REGIONSTATS` SQL, unified diff, and `ae` CLI commands**:
+
+<video src="static/cloud_run_full_walkthrough.mp4" poster="static/pdi_snap_playground.png" controls autoplay loop muted playsinline width="100%">
+  <source src="static/cloud_run_full_walkthrough.mp4" type="video/mp4" />
+</video>
+
+![Live Cloud Run End-to-End Walkthrough — Circana × Google Maps PDI × AlphaEvolve](static/cloud_run_full_walkthrough.gif)
+
+*Direct Cloud Run walkthrough video assets in [`static/`](static/): [`static/cloud_run_full_walkthrough.mp4`](static/cloud_run_full_walkthrough.mp4) • [`static/cloud_run_full_walkthrough.gif`](static/cloud_run_full_walkthrough.gif)*
 
 ![Google Maps PDI S2 Level 12 Explorer & Trade-Area Rollup](static/pdi_snap_playground.png)
 
